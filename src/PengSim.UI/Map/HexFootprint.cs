@@ -1,3 +1,4 @@
+using HexCell = PengSim.BL.Model.HexCell;
 namespace PengSim.UI.Map;
 
 /// <summary>Maps the centered playable hex into the simulation storage grid.</summary>

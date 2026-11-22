@@ -1,6 +1,6 @@
 # PengSim
 
-PengSim is a .NET 10 terminal application for exploring a penguin simulation on a **hexagonal map**. The current demo places 5,000 penguins in five clusters.
+PengSim is a .NET 10 terminal application for exploring a penguin simulation on a **hexagonal map**. Run demo scatters 5,000 penguins across a hexagonal board of radius 150 (301 hexes across the center, 67,951 playable cells) and calculates 1,000 iterations. A progress bar shows the completed iterations and average iterations per second. When generation finishes, review the elapsed time, speed, and simulation details. Press A to analyze the run from its starting positions.
 
 ## Run
 
@@ -24,8 +24,11 @@ The **main map** shows the area you are looking at. The **minimap** shows the wh
 | Key | Action |
 | --- | --- |
 | `+` / `-` | Zoom in / out |
-| Arrow keys or WASD | Move the view while zoomed in |
-| Shift + arrow keys | Move one cell at a time |
+| WASD | Move the view while zoomed in |
+| Shift + WASD | Move one cell at a time |
+| Home | Pause and jump to the initial frame |
+| Left / right arrow | Pause and step back / forward one frame |
+| `1`–`9` / `0` | Play at the selected frames per second / pause |
 | `R` | Reset view |
 | `Q` | Quit |
 
@@ -35,4 +38,4 @@ The **main map** shows the area you are looking at. The **minimap** shows the wh
 - `src/PengSim.UI/` — terminal visualization and demo
 - [How rendering works](src/PengSim.UI/RENDERING.md) — short technical overview
 
-The engine creates an empty simulation. Each simulation owns a grid of penguin IDs and a dictionary of penguins keyed by ID. Zero means an empty cell. `Simulation.AddPenguin` assigns the next ID and updates both structures. The demo supplies the hexagonal footprint and places the colonies.
+The engine creates an empty simulation. Each simulation owns a grid of penguin IDs and a dictionary of penguins keyed by ID. Zero means an empty cell. `Simulation.AddPenguin` assigns the next ID and updates both structures. The simulation keeps the initial grid and one grid per completed iteration in RAM. For now, each penguin takes one turn per iteration and moves into an empty neighboring hex closer to the center if one is available.

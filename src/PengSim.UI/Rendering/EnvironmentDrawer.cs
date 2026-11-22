@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Globalization;
 using PengSim.UI.Map;
 using HexEnvironment = PengSim.BL.Model.Environment;
 
@@ -25,105 +24,82 @@ internal sealed class EnvironmentDrawer
     private const int RedirectedOutputWidth = 101;
     private const int RedirectedOutputHeight = 35;
 
-    private const string ProfileEnabledVariable = "PENGSIM_PROFILE";
-    private const string ProfilePathVariable = "PENGSIM_PROFILE_PATH";
-    private const string DefaultProfilePath = "pengsim-profile.log";
-
-    /// <summary>
-    /// Initializes the sparse zoom index once, then draws frames from the
-    /// current environment. Profiling writes only after terminal rendering
-    /// finishes, so it cannot interfere with cursor positioning.
-    /// </summary>
-    public void Show(
-        HexEnvironment environment,
-        HexFootprint footprint,
-        string simulationName,
-        string? outputPath = null,
-        int iteration = 0)
+    public void Show(IReadOnlyList<HexEnvironment> frames, HexFootprint footprint, string simulationName)
     {
-        var profile = new Profile(
-            System.Environment.GetEnvironmentVariable(ProfileEnabledVariable) == "1");
-        try
+        var iteration = 0;
+        var speed = 0;
+        var nextFrame = TimeSpan.Zero;
+        var clock = Stopwatch.StartNew();
+        var heatmap = new HexHeatmap(footprint);
+        heatmap.Rebuild(frames[iteration]);
+        var camera = new MapCamera(footprint);
+
+        string[] Draw(FrameLayout layout, bool ansi = true) =>
+            FrameRenderer.RenderRows(frames[iteration], footprint, heatmap, camera,
+                simulationName, iteration, frames.Count - 1, speed, layout, ansi);
+
+        if (Console.IsInputRedirected || Console.IsOutputRedirected)
         {
-            // Building the sparse population index is an initialization cost,
-            // not part of the per-keypress frame budget.
-            var started = Stopwatch.GetTimestamp();
-            var heatmap = new HexHeatmap(footprint);
-            heatmap.Rebuild(environment); // One density snapshot for this iteration.
-            profile.Startup = Stopwatch.GetTimestamp() - started;
-            var camera = new MapCamera(footprint);
-
-            // Draw returns fully prepared rows; it never writes to the terminal.
-            string[] Draw(FrameLayout layout, bool ansi = true) =>
-                FrameRenderer.RenderRows(environment, footprint, heatmap, camera,
-                    simulationName, outputPath, iteration, layout, ansi);
-
-            if (Console.IsInputRedirected || Console.IsOutputRedirected)
-            {
-                // Non-interactive output is plain text (no cursor movement,
-                // no escape sequences) with a deterministic display size.
-                var layout = FrameLayout.Create(RedirectedOutputWidth, RedirectedOutputHeight);
-                foreach (var row in Draw(layout, ansi: false))
-                {
-                    Console.WriteLine(row);
-                }
-
-                return;
-            }
-
-            // Cursor management and terminal diffing live in TerminalPresenter;
-            // the map renderer is unaware of terminal output operations.
-            using var renderer = new TerminalPresenter();
-            renderer.Start();
-            var initialWidth = Console.WindowWidth;
-            var initialHeight = Console.WindowHeight;
-            renderer.Present(Draw(FrameLayout.Create(initialWidth, initialHeight)),
-                initialWidth, initialHeight);
-
-            // Width/height are part of the key so resizing invalidates the
-            // old screen even when the camera has not moved.
-            var last = (camera.Center, camera.Level, initialWidth, initialHeight);
-            while (true)
-            {
-                var width = Console.WindowWidth;
-                var height = Console.WindowHeight;
-                var layout = FrameLayout.Create(width, height);
-
-                // Apply all queued keys before asking for a new complete frame.
-                // Only the final camera state of this batch becomes visible.
-                var count = 0;
-                while (count < MaxKeysPerFrame && Console.KeyAvailable)
-                {
-                    if (!Navigate(Console.ReadKey(intercept: true), camera, heatmap, layout))
-                    {
-                        return;
-                    }
-
-                    count++;
-                }
-
-                var state = (camera.Center, camera.Level, width, height);
-                if (state != last)
-                {
-                    // Measure rendering/composition separately from terminal
-                    // output; previous profiling showed layout can dominate.
-                    started = Stopwatch.GetTimestamp();
-                    var rows = Draw(layout);
-                    var ready = Stopwatch.GetTimestamp();
-                    renderer.Present(rows, state.Item3, state.Item4);
-                    profile.Record(ready - started, Stopwatch.GetTimestamp() - ready);
-                    last = state;
-                }
-
-                if (count == 0)
-                {
-                    Thread.Sleep(InputPollMilliseconds);
-                }
-            }
+            var layout = FrameLayout.Create(RedirectedOutputWidth, RedirectedOutputHeight);
+            foreach (var row in Draw(layout, ansi: false)) Console.WriteLine(row);
+            return;
         }
-        finally
+
+        using var renderer = new TerminalPresenter();
+        renderer.Start();
+        var width = Console.WindowWidth;
+        var height = Console.WindowHeight;
+        renderer.Present(Draw(FrameLayout.Create(width, height)), width, height);
+        var last = (camera.Center, camera.Level, width, height, iteration, speed);
+        while (true)
         {
-            profile.Save();
+            width = Console.WindowWidth;
+            height = Console.WindowHeight;
+            var layout = FrameLayout.Create(width, height);
+            var count = 0;
+            while (count < MaxKeysPerFrame && Console.KeyAvailable)
+            {
+                var input = Console.ReadKey(intercept: true);
+                if (input.Key == ConsoleKey.Home)
+                {
+                    iteration = 0;
+                    speed = 0;
+                }
+                else if (input.Key is ConsoleKey.LeftArrow or ConsoleKey.RightArrow)
+                {
+                    speed = 0;
+                    iteration = Math.Clamp(iteration + (input.Key == ConsoleKey.LeftArrow ? -1 : 1),
+                        0, frames.Count - 1);
+                }
+                else if (char.IsAsciiDigit(input.KeyChar))
+                {
+                    speed = input.KeyChar - '0';
+                    if (speed > 0) nextFrame = clock.Elapsed + TimeSpan.FromSeconds(1d / speed);
+                }
+                else if (!Navigate(input, camera, heatmap, layout))
+                {
+                    return;
+                }
+
+                count++;
+            }
+
+            if (speed > 0 && clock.Elapsed >= nextFrame)
+            {
+                iteration = Math.Min(iteration + 1, frames.Count - 1);
+                nextFrame += TimeSpan.FromSeconds(1d / speed);
+            }
+            if (iteration == frames.Count - 1) speed = 0;
+
+            var state = (camera.Center, camera.Level, width, height, iteration, speed);
+            if (state != last)
+            {
+                if (iteration != last.iteration) heatmap.Rebuild(frames[iteration]);
+                renderer.Present(Draw(layout), width, height);
+                last = state;
+            }
+
+            if (count == 0) Thread.Sleep(InputPollMilliseconds);
         }
     }
 
@@ -146,10 +122,10 @@ internal sealed class EnvironmentDrawer
 
         var (horizontal, vertical) = input.Key switch
         {
-            ConsoleKey.LeftArrow or ConsoleKey.A => (-1, 0),
-            ConsoleKey.RightArrow or ConsoleKey.D => (1, 0),
-            ConsoleKey.UpArrow or ConsoleKey.W => (0, -1),
-            ConsoleKey.DownArrow or ConsoleKey.S => (0, 1),
+            ConsoleKey.A => (-1, 0),
+            ConsoleKey.D => (1, 0),
+            ConsoleKey.W => (0, -1),
+            ConsoleKey.S => (0, 1),
             _ => (0, 0),
         };
 
@@ -182,57 +158,4 @@ internal sealed class EnvironmentDrawer
         return true;
     }
 
-    /// <summary>
-    /// Optional lightweight timing accumulator. A report is written after
-    /// the screen has been restored, not during an interactive frame.
-    /// </summary>
-    private sealed class Profile(bool enabled)
-    {
-        private long _prepare;
-        private long _output;
-        private long _slowestOutput;
-        private int _frames;
-
-        public long Startup { get; set; }
-
-        public void Record(long preparation, long output)
-        {
-            if (!enabled) return;
-            _frames++;
-            _prepare += preparation;
-            _output += output;
-            _slowestOutput = Math.Max(_slowestOutput, output);
-        }
-
-        public void Save()
-        {
-            if (!enabled) return;
-
-            // Stopwatch timestamps are ticks; convert via the measured clock
-            // frequency rather than assuming any fixed tick duration.
-            var frequency = (double)Stopwatch.Frequency;
-            var frames = Math.Max(1, _frames);
-            string Ms(double ticks) => (ticks * 1000 / frequency).ToString("F2", CultureInfo.InvariantCulture);
-            var content = string.Join("\n",
-                "PengSim performance profile",
-                "Renderer: Direct terminal compositor",
-                $"Recorded frames: {_frames}",
-                $"Initial sparse bucket index: {Ms(Startup)} ms",
-                $"Average frame preparation: {Ms(_prepare / (double)frames)} ms",
-                $"Average output update: {Ms(_output / (double)frames)} ms",
-                $"Slowest output update: {Ms(_slowestOutput)} ms",
-                "");
-
-            var path = System.Environment.GetEnvironmentVariable(ProfilePathVariable);
-            if (string.IsNullOrWhiteSpace(path)) path = DefaultProfilePath;
-            try
-            {
-                File.WriteAllText(Path.GetFullPath(path), content);
-            }
-            catch (Exception error) when (error is IOException or UnauthorizedAccessException or ArgumentException)
-            {
-                Console.Error.WriteLine($"Could not save profile: {error.Message}");
-            }
-        }
-    }
 }

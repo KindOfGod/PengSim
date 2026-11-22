@@ -1,4 +1,3 @@
-using System.Text;
 using Spectre.Console;
 using Spectre.Console.Rendering;
 using HexEnvironment = PengSim.BL.Model.Environment;
@@ -7,26 +6,27 @@ namespace PengSim.UI;
 
 internal sealed class EnvironmentDrawer(IAnsiConsole console)
 {
-    private static readonly (int Maximum, string Dot, string Label)[] HeatmapScale =
+    private static readonly (int Maximum, string Glyph, string Label)[] HeatmapScale =
     [
-        (0, "[grey]·[/]", "0"),
-        (1, "[blue]●[/]", "1"),
-        (3, "[aqua]●[/]", "2–3"),
-        (7, "[green]●[/]", "4–7"),
-        (15, "[yellow]●[/]", "8–15"),
-        (int.MaxValue, "[red]●[/]", "16+"),
+        (0, "[grey]⬡[/]", "0"),
+        (1, "[blue]⬢[/]", "1"),
+        (3, "[aqua]⬢[/]", "2–3"),
+        (7, "[green]⬢[/]", "4–7"),
+        (15, "[yellow]⬢[/]", "8–15"),
+        (int.MaxValue, "[red]⬢[/]", "16+"),
     ];
 
-    public void Show(HexEnvironment environment, IReadOnlyCollection<(int Column, int Row)> penguins)
+    public void Show(HexEnvironment environment)
     {
+        var heatmap = new HexHeatmap(environment);
         var camera = new MapCamera(environment.Width, environment.Height);
         if (Console.IsInputRedirected || Console.IsOutputRedirected || !console.Profile.Capabilities.Interactive)
         {
-            console.Write(Render(environment, penguins, camera, interactive: false));
+            console.Write(Render(environment, heatmap, camera, interactive: false));
             return;
         }
 
-        console.Live(Render(environment, penguins, camera, interactive: true))
+        console.Live(Render(environment, heatmap, camera, interactive: true))
             .AutoClear(false)
             .Start(context =>
             {
@@ -44,7 +44,7 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
                     var size = (console.Profile.Width, console.Profile.Height);
                     if (bounds != lastBounds || size != lastSize)
                     {
-                        context.UpdateTarget(Render(environment, penguins, camera, interactive: true));
+                        context.UpdateTarget(Render(environment, heatmap, camera, interactive: true));
                         context.Refresh();
                         lastBounds = bounds;
                         lastSize = size;
@@ -57,24 +57,43 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
 
     private IRenderable Render(
         HexEnvironment environment,
-        IReadOnlyCollection<(int Column, int Row)> penguins,
+        HexHeatmap heatmap,
         MapCamera camera,
         bool interactive)
     {
         int terminalWidth = console.Profile.Width;
         int terminalHeight = console.Profile.Height;
+        if (terminalHeight <= 0)
+        {
+            terminalHeight = 24;
+        }
+
         bool showControls = interactive && terminalWidth >= 20 && terminalHeight >= 6;
         int width = Math.Max(1, terminalWidth - 4);
         int height = Math.Max(1, terminalHeight - (showControls ? 5 : 2));
         var bounds = camera.VisibleBounds;
         bool showHexes = camera.Zoom > 0 && bounds.Width <= width / 2 && bounds.Height <= height;
         bool showScale = !showHexes && terminalWidth >= HeatmapScale.Length && terminalHeight >= 4;
-        string map = showHexes
-            ? DrawHexes(environment, bounds)
-            : DrawHeatmap(penguins, bounds, width, Math.Max(1, height - (showScale ? 1 : 0)));
+        string map;
+        string title;
+        if (showHexes)
+        {
+            map = DrawHexes(bounds, (column, row) => environment[column, row] == HexEnvironment.EmptyCell
+                ? "⬡"
+                : "[blue]⬢[/]");
+            title = "Hex grid · L0";
+        }
+        else
+        {
+            var view = heatmap.GetView(bounds, Math.Max(1, width / 2), Math.Max(1, height - (showScale ? 1 : 0)));
+            map = DrawHexes(view.Bounds, (column, row) => view.Counts.TryGetValue((column, row), out int count)
+                ? HeatmapScale.First(band => count <= band.Maximum).Glyph
+                : " ");
+            title = $"Heatmap · L{view.Level}";
+        }
 
         var panel = new Panel(new Markup(map))
-            .Header(showHexes ? "Hex grid" : "Heatmap")
+            .Header(title)
             .Border(BoxBorder.Rounded);
 
         var content = new List<IRenderable> { panel };
@@ -98,18 +117,18 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
 
     private static string DrawScale(int width)
     {
-        string fullScale = "Penguins per bucket  "
-            + string.Join("  ", HeatmapScale.Select(band => $"{band.Dot} {band.Label}"));
+        string fullScale = "Penguins per hex  "
+            + string.Join("  ", HeatmapScale.Select(band => $"{band.Glyph} {band.Label}"));
         if (width >= Markup.Remove(fullScale).Length)
         {
             return fullScale;
         }
 
-        string dots = string.Concat(HeatmapScale.Select(band => band.Dot));
-        return width >= 12 ? $"0 {dots} 16+" : dots;
+        string glyphs = string.Concat(HeatmapScale.Select(band => band.Glyph));
+        return width >= 12 ? $"0 {glyphs} 16+" : glyphs;
     }
 
-    private static string DrawHexes(HexEnvironment environment, MapViewport bounds)
+    private static string DrawHexes(MapViewport bounds, Func<int, int, string> cellGlyph)
     {
         var rows = new string[bounds.Height];
         for (int y = 0; y < bounds.Height; y++)
@@ -118,63 +137,13 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
             var cells = new string[bounds.Width];
             for (int x = 0; x < bounds.Width; x++)
             {
-                cells[x] = environment[bounds.Left + x, row] == HexEnvironment.EmptyCell
-                    ? "⬡"
-                    : "[blue]⬢[/]";
+                cells[x] = cellGlyph(bounds.Left + x, row);
             }
 
-            rows[y] = (row % 2 == 0 ? "" : " ") + string.Join(" ", cells);
+            rows[y] = ((row & 1) == 0 ? "" : " ") + string.Join(" ", cells).TrimEnd();
         }
 
         return string.Join("\n", rows);
-    }
-
-    private static string DrawHeatmap(
-        IReadOnlyCollection<(int Column, int Row)> penguins,
-        MapViewport bounds,
-        int availableWidth,
-        int availableHeight)
-    {
-        // Half-cell horizontal units preserve the odd-row offset when bucketing.
-        int worldWidth = bounds.Width * 2;
-        int columns = Math.Min(availableWidth, worldWidth);
-        int rows = Math.Min(availableHeight, bounds.Height);
-        var counts = new int[rows, columns];
-
-        foreach (var (column, row) in penguins)
-        {
-            int x = column - bounds.Left;
-            int y = row - bounds.Top;
-            if (x >= 0 && x < bounds.Width && y >= 0 && y < bounds.Height)
-            {
-                int bucketX = (x * 2 + row % 2) * columns / worldWidth;
-                int bucketY = y * rows / bounds.Height;
-                counts[bucketY, bucketX]++;
-            }
-        }
-
-        var markup = new StringBuilder();
-        for (int y = 0; y < rows; y++)
-        {
-            if (y > 0)
-            {
-                markup.Append('\n');
-            }
-
-            for (int x = 0; x < columns; x++)
-            {
-                foreach (var band in HeatmapScale)
-                {
-                    if (counts[y, x] <= band.Maximum)
-                    {
-                        markup.Append(band.Dot);
-                        break;
-                    }
-                }
-            }
-        }
-
-        return markup.ToString();
     }
 
     private static bool Navigate(ConsoleKeyInfo input, MapCamera camera)

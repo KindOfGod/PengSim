@@ -25,6 +25,6 @@ internal sealed class SimulationDemo(ISimulationEngine engine, EnvironmentDrawer
             }
         }
 
-        drawer.Show(simulation.Environment, positions);
+        drawer.Show(simulation.Environment);
     }
 }

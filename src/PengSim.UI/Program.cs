@@ -1,8 +1,19 @@
+using Autofac;
+using PengSim.BL;
+using Spectre.Console;
+
 namespace PengSim.UI;
 
 internal static class Program
 {
     private static void Main()
     {
+        var builder = new ContainerBuilder();
+        builder.RegisterModule<SimulationModule>();
+        builder.RegisterInstance(AnsiConsole.Console).As<IAnsiConsole>().ExternallyOwned();
+        builder.RegisterType<SimulationDemo>();
+
+        using var container = builder.Build();
+        container.Resolve<SimulationDemo>().Run();
     }
 }

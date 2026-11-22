@@ -18,18 +18,21 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
         (int.MaxValue, "red", "16+"),
     ];
 
-    public void Show(HexEnvironment environment, HexFootprint footprint)
+    public void Show(HexEnvironment environment, HexFootprint footprint, string simulationName, string? outputPath = null)
     {
         var heatmap = new HexHeatmap(environment, footprint);
         var camera = new MapCamera(footprint);
+        var details = new Rows(
+            new Text($"{Emoji.Known.Penguin}  Name: {simulationName}") { Overflow = Overflow.Ellipsis },
+            new Text($"{Emoji.Known.FileFolder}  Path: {outputPath ?? "Unsaved"}") { Overflow = Overflow.Ellipsis });
         if (Console.IsInputRedirected || Console.IsOutputRedirected || !console.Profile.Capabilities.Interactive)
         {
-            console.Write(Render(environment, footprint, heatmap, camera, interactive: false));
+            console.Write(Render(environment, footprint, heatmap, camera, details, interactive: false));
             return;
         }
 
         console.Clear();
-        console.Live(Render(environment, footprint, heatmap, camera, interactive: true))
+        console.Live(Render(environment, footprint, heatmap, camera, details, interactive: true))
             .AutoClear(false)
             .Start(context =>
             {
@@ -47,7 +50,7 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
                     var size = (console.Profile.Width, console.Profile.Height);
                     if (camera.Center != lastCenter || camera.Level != lastLevel || size != lastSize)
                     {
-                        context.UpdateTarget(Render(environment, footprint, heatmap, camera, interactive: true));
+                        context.UpdateTarget(Render(environment, footprint, heatmap, camera, details, interactive: true));
                         context.Refresh();
                         lastCenter = camera.Center;
                         lastLevel = camera.Level;
@@ -64,6 +67,7 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
         HexFootprint footprint,
         HexHeatmap heatmap,
         MapCamera camera,
+        Rows details,
         bool interactive)
     {
         var layout = GetLayout(interactive);
@@ -142,29 +146,32 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
             maps = new Rows(main, side);
         }
 
-        var content = new List<IRenderable> { maps };
+        var content = new List<IRenderable> { details, maps };
+        int width = FrameContentWidth;
         if (layout.ShowScale)
         {
-            content.Add(new Markup(DrawScale(console.Profile.Width)));
+            content.Add(new Markup(DrawScale(width)));
         }
 
         if (layout.ShowControls)
         {
             var (column, row) = footprint.ToOffset(camera.Center);
             string position = camera.Level.HasValue ? $"Zoom L{level}  ({column},{row})" : $"Overview  ({column},{row})";
-            if (camera.Level.HasValue && position.Length + 13 <= console.Profile.Width)
+            if (camera.Level.HasValue && position.Length + 13 <= width)
             {
                 position += "  ◈ viewport";
             }
 
-            string controls = console.Profile.Width >= 65
+            string controls = width >= 65
                 ? "Arrows/WASD pan  Shift+arrows fine  +/- zoom  R reset  Q quit"
-                : console.Profile.Width >= 32 ? "Arrows  Shift: fine  +/-  R  Q" : "WASD +/- R Q";
+                : width >= 32 ? "Arrows  Shift: fine  +/-  R  Q" : "WASD +/- R Q";
             content.Add(new Text(position));
             content.Add(new Text(controls));
         }
 
-        return new Rows(content);
+        return new Panel(new Rows(content)) { Padding = new Padding(1, 0) }
+            .Header("Penguine Simulation")
+            .Border(BoxBorder.Rounded);
     }
 
     private static Panel DrawPanel(string title, HexRegion region, int maxWidth, Func<HexCell, string> glyph) =>
@@ -211,10 +218,14 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
         return width >= 12 ? $"0 {glyphs} 16+" : glyphs;
     }
 
+    private int FrameContentWidth => Math.Max(1, console.Profile.Width - 4);
+
     private Layout GetLayout(bool interactive)
     {
-        int width = console.Profile.Width;
-        int height = console.Profile.Height > 0 ? console.Profile.Height : 24;
+        int width = FrameContentWidth;
+        int terminalHeight = console.Profile.Height > 0 ? console.Profile.Height : 24;
+        // Reserve two border rows and two simulation details rows.
+        int height = Math.Max(1, terminalHeight - 4);
         bool sideBySide = width >= 38;
         bool showControls = interactive && width >= 26 && height >= (sideBySide ? 9 : 14);
         bool showScale = width >= 6 && height >= (sideBySide ? 7 : 11);

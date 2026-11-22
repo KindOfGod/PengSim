@@ -30,6 +30,6 @@ internal sealed class SimulationDemo(ISimulationEngine engine, EnvironmentDrawer
             }
         }
 
-        drawer.Show(simulation.Environment, footprint);
+        drawer.Show(simulation.Environment, footprint, simulationName: "Penguin colonies demo");
     }
 }

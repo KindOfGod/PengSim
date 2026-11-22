@@ -89,3 +89,8 @@ Add an entry here when making a change or deciding how the simulation is designe
 ## 2026-11-22 — Consistent overview cells
 
 - The main heatmap and minimap show empty cells within the full-world hex as hollow hexagons. The overview displays hollow and filled hexagons inside a purple outline. Grey off-map dots are used only when zoomed in.
+
+## 2026-11-22 — Application frame and simulation details
+
+- The console wraps the maps, Information panel, legend, and controls in a border titled “Penguine Simulation”. Two rows show the simulation name and output path with Spectre.Console's penguin and folder icons.
+- The demo is named “Penguin colonies demo” and shows “Unsaved” until an output path is supplied. Rendering accepts an optional path and reserves space for the metadata in its terminal layout.

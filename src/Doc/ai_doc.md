@@ -61,3 +61,12 @@ Add an entry here when making a change or deciding how the simulation is designe
 ## 2026-11-22 — Clear the interactive terminal on startup
 
 - The console clears once before starting the live map, so the first frame appears at the top. Redirected input or output still produces a single snapshot.
+
+## 2026-11-22 — Global minimap navigation
+
+- The minimap keeps the entire world visible and reserves space for the viewport marker to overlap the world outline. Pan keys can reach edge parents even when the center of an edge parent lies outside the playable area.
+- Shift plus an arrow pans one base cell at a time so you can reach locations between minimap centers. On a terminal that can display only one overview cell, regular pan keys also use base-cell steps.
+
+## 2026-11-22 — Precomputed map hierarchy
+
+- Startup builds the full parent hierarchy, including density, base-cell membership, a bounds check, and a playable landing point for every parent. The full-world overview reuses the stored levels directly. Panning and zooming query the stored membership and counts.

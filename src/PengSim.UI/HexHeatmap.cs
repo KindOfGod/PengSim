@@ -5,74 +5,117 @@ namespace PengSim.UI;
 internal sealed class HexHeatmap
 {
     private readonly HexRegion _world;
-    private readonly List<Dictionary<HexCell, int>> _levels = [];
+    private readonly List<Level> _levels = [];
 
     public HexHeatmap(HexEnvironment environment, HexFootprint footprint)
     {
         _world = footprint.Region;
-        var level = new Dictionary<HexCell, int>();
+        var occupied = new HashSet<HexCell>();
+        var groups = new Dictionary<HexCell, List<HexCell>>();
         foreach (var cell in _world.Cells())
         {
             var (column, row) = footprint.ToOffset(cell);
-            level.Add(cell, environment[column, row] == HexEnvironment.EmptyCell ? 0 : 1);
-        }
-
-        _levels.Add(level);
-        do
-        {
-            var parents = new Dictionary<HexCell, int>();
-            foreach (var (cell, count) in level)
+            if (environment[column, row] != HexEnvironment.EmptyCell)
             {
-                var parent = cell.Parent();
-                parents[parent] = parents.GetValueOrDefault(parent) + count;
+                occupied.Add(cell);
             }
 
-            _levels.Add(parents);
-            level = parents;
-        } while (level.Count > 1);
+            AddChildren(groups, cell.Parent(), [cell]);
+        }
+
+        while (true)
+        {
+            int number = _levels.Count + 1;
+            var buckets = new Dictionary<HexCell, Bucket>();
+            var counts = new Dictionary<HexCell, int>();
+            foreach (var (parent, children) in groups)
+            {
+                var center = parent.DescendToCenter(number);
+                int count = children.Count(occupied.Contains);
+                buckets.Add(parent, new Bucket(
+                    new HexRegion(center, children.Max(cell => cell.DistanceTo(center))),
+                    children,
+                    children.MinBy(cell => cell.DistanceTo(center)),
+                    count));
+                counts.Add(parent, count);
+            }
+
+            int radius = groups.Keys.Max(cell => cell.DistanceTo(default));
+            _levels.Add(new Level(new HexRegion(default, radius), counts, buckets));
+            if (groups.Count == 1)
+            {
+                break;
+            }
+
+            var parents = new Dictionary<HexCell, List<HexCell>>();
+            foreach (var (cell, children) in groups)
+            {
+                AddChildren(parents, cell.Parent(), children);
+            }
+
+            groups = parents;
+        }
     }
+
+    public HexCell? FindBaseCell(HexCell parent, int level) =>
+        _levels[level - 1].Buckets.TryGetValue(parent, out var bucket) ? bucket.BaseCell : null;
 
     public (int Level, HexRegion Region, IReadOnlyDictionary<HexCell, int> Counts) GetView(
         HexRegion viewport, int maxRadius)
     {
-        if (viewport == _world)
+        for (int index = 0; index < _levels.Count; index++)
         {
-            for (int level = 1; level < _levels.Count; level++)
+            var level = _levels[index];
+            if (viewport == _world)
             {
-                var counts = _levels[level];
-                int radius = counts.Keys.Max(cell => cell.DistanceTo(default));
-                if (radius <= maxRadius)
+                if (level.Region.Radius <= maxRadius)
                 {
-                    return (level, new HexRegion(default, radius), counts);
+                    return (index + 1, level.Region, level.Counts);
                 }
-            }
-        }
 
-        var cells = viewport.Cells().ToHashSet();
-        var center = viewport.Center;
-        for (int level = 1; level < _levels.Count; level++)
-        {
-            center = center.Parent();
-            cells = cells.Select(cell => cell.Parent()).ToHashSet();
-            int radius = cells.Max(cell => cell.DistanceTo(center));
-            if (radius > maxRadius && level < _levels.Count - 1)
-            {
                 continue;
             }
 
+            var center = viewport.Center.Ancestor(index + 1);
             var counts = new Dictionary<HexCell, int>();
-            foreach (var cell in cells)
+            int radius = 0;
+            foreach (var (parent, bucket) in level.Buckets)
             {
-                if (_levels[level].TryGetValue(cell, out int count))
+                if (bucket.Intersects(viewport))
                 {
-                    counts.Add(cell, count);
+                    radius = Math.Max(radius, parent.DistanceTo(center));
+                    counts.Add(parent, bucket.Count);
                 }
             }
 
-            return (level, new HexRegion(center, radius), counts);
+            if (radius <= maxRadius)
+            {
+                return (index + 1, new HexRegion(center, radius), counts);
+            }
         }
 
-        throw new InvalidOperationException("The heatmap requires a parent level.");
+        throw new InvalidOperationException("No parent level fits the viewport.");
     }
 
+    private static void AddChildren(
+        Dictionary<HexCell, List<HexCell>> groups, HexCell parent, IEnumerable<HexCell> children)
+    {
+        if (!groups.TryGetValue(parent, out var group))
+        {
+            group = [];
+            groups.Add(parent, group);
+        }
+
+        group.AddRange(children);
+    }
+
+    private sealed record Level(
+        HexRegion Region, Dictionary<HexCell, int> Counts, Dictionary<HexCell, Bucket> Buckets);
+
+    private sealed record Bucket(HexRegion Bounds, List<HexCell> Children, HexCell BaseCell, int Count)
+    {
+        public bool Intersects(HexRegion viewport) =>
+            Bounds.Center.DistanceTo(viewport.Center) <= Bounds.Radius + viewport.Radius
+            && Children.Any(viewport.Contains);
+    }
 }

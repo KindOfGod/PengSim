@@ -47,13 +47,6 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
                     var size = (console.Profile.Width, console.Profile.Height);
                     if (view != lastView || camera.Zoom != lastZoom || size != lastSize)
                     {
-                        if (camera.Zoom > 0)
-                        {
-                            var overview = heatmap.GetView(footprint.Region, GetLayout(camera.Zoom, true).MiniRadius);
-                            camera.KeepMarkerInBounds(overview.Level, MarkerLimits(view.Radius, overview.Level, overview.Region));
-                            view = camera.View;
-                        }
-
                         context.UpdateTarget(Render(environment, footprint, heatmap, camera, interactive: true));
                         context.Refresh();
                         lastView = view;
@@ -100,11 +93,22 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
         IRenderable maps = main;
         if (camera.Zoom > 0)
         {
-            var overview = heatmap.GetView(footprint.Region, layout.MiniRadius);
-            var limits = MarkerLimits(view.Radius, overview.Level, overview.Region);
-            var marker = new HexRegion(view.Center.Ancestor(overview.Level), overview.Region.Radius - limits.Radius);
-            var mini = DrawPanel($"Minimap · L{overview.Level}", overview.Region, layout.MiniWidth,
-                cell => DensityGlyph(overview.Counts.GetValueOrDefault(cell), marker.Contains(cell)));
+            var overview = GetOverview(heatmap, footprint.Region, layout.MiniRadius);
+            int markerRadius = OverviewRadius(view.Radius, overview.Level);
+            var marker = new HexRegion(view.Center.Ancestor(overview.Level), markerRadius);
+            var miniBounds = overview.Region with
+            {
+                Radius = overview.Region.Radius + markerRadius,
+            };
+            var mini = DrawPanel($"Minimap · L{overview.Level}", miniBounds, layout.MiniWidth, cell =>
+            {
+                if (marker.Contains(cell))
+                {
+                    return DensityGlyph(overview.Counts.GetValueOrDefault(cell), highlighted: true);
+                }
+
+                return overview.Region.Contains(cell) ? DensityGlyph(overview.Counts.GetValueOrDefault(cell)) : " ";
+            });
 
             if (layout.SideBySide)
             {
@@ -136,9 +140,9 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
                 position += "  ◈ viewport";
             }
 
-            string controls = console.Profile.Width >= 42
-                ? "Arrows/WASD pan  +/- zoom  R reset  Q quit"
-                : "WASD +/- R Q";
+            string controls = console.Profile.Width >= 65
+                ? "Arrows/WASD pan  Shift+arrows fine  +/- zoom  R reset  Q quit"
+                : console.Profile.Width >= 32 ? "Arrows  Shift: fine  +/-  R  Q" : "WASD +/- R Q";
             content.Add(new Text(position));
             content.Add(new Text(controls));
         }
@@ -204,7 +208,7 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
         bool showControls = interactive && width >= 26 && height >= (showMini && !sideBySide ? 11 : 7);
         bool showScale = width >= 6 && height >= (showMini && !sideBySide ? 9 : 5);
         int mapHeight = height - (showControls ? 2 : 0) - (showScale ? 1 : 0);
-        int miniWidth = sideBySide ? Math.Clamp(width / 3, 15, 27) : width;
+        int miniWidth = sideBySide ? Math.Clamp(width / 2 - 6, 15, 33) : width;
         int miniHeight = !showMini || sideBySide ? mapHeight : Math.Max(3, mapHeight / 3);
         int mainWidth = sideBySide ? width - miniWidth - 1 : width;
         int mainHeight = showMini && !sideBySide ? mapHeight - miniHeight : mapHeight;
@@ -216,12 +220,20 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
     private static int FittingRadius(int width, int height) =>
         Math.Max(0, Math.Min((width - 5) / 4, (height - 3) / 2));
 
-    private static HexRegion MarkerLimits(int viewRadius, int overviewLevel, HexRegion overview)
+    private static int OverviewRadius(int radius, int level) =>
+        (int)Math.Round(radius / Math.Pow(7, level / 2.0));
+
+    private static (int Level, HexRegion Region, IReadOnlyDictionary<HexCell, int> Counts) GetOverview(
+        HexHeatmap heatmap, HexRegion world, int availableRadius)
     {
-        // Each aggregation level reduces linear scale by the square root of seven.
-        int radius = (int)Math.Round(viewRadius / Math.Pow(7, overviewLevel / 2.0));
-        radius = Math.Clamp(radius, 0, Math.Max(0, overview.Radius - 1));
-        return overview with { Radius = overview.Radius - radius };
+        var overview = heatmap.GetView(world, availableRadius);
+        int largestViewRadius = (world.Radius + 1) / 2;
+        while (overview.Region.Radius + OverviewRadius(largestViewRadius, overview.Level) > availableRadius)
+        {
+            overview = heatmap.GetView(world, overview.Region.Radius - 1);
+        }
+
+        return overview;
     }
 
     private bool Navigate(ConsoleKeyInfo input, MapCamera camera, HexHeatmap heatmap, HexRegion world)
@@ -246,9 +258,15 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
         };
         if (camera.Zoom > 0 && direction != (0, 0))
         {
-            var overview = heatmap.GetView(world, GetLayout(camera.Zoom, true).MiniRadius);
-            var limits = MarkerLimits(camera.View.Radius, overview.Level, overview.Region);
-            camera.Pan(direction.Item1, direction.Item2, overview.Level, limits);
+            var overview = GetOverview(heatmap, world, GetLayout(camera.Zoom, true).MiniRadius);
+            if (input.Modifiers.HasFlag(ConsoleModifiers.Shift) || overview.Counts.Count == 1)
+            {
+                camera.PanFine(direction.Item1, direction.Item2);
+            }
+            else
+            {
+                camera.Pan(direction.Item1, direction.Item2, overview.Level, heatmap);
+            }
         }
 
         if (input.KeyChar == '+' && (camera.Zoom == 0 || camera.View.Radius > GetLayout(camera.Zoom, true).MainRadius))

@@ -1,15 +1,16 @@
+using System.Diagnostics;
+using System.Globalization;
 using PengSim.UI.Map;
-using Spectre.Console;
 using HexEnvironment = PengSim.BL.Model.Environment;
 
 namespace PengSim.UI.Rendering;
 
-/// <summary>Runs a console session for one simulation snapshot.</summary>
-internal sealed class EnvironmentDrawer(IAnsiConsole console)
+/// <summary>Displays visible hexes with one terminal update per input batch.</summary>
+internal sealed class EnvironmentDrawer
 {
-    private const int InputPollMilliseconds = 30;
+    private const int InputPollMilliseconds = 8;
+    private const int MaxKeysPerFrame = 32;
 
-    /// <summary>Shows the live map in a terminal or prints one frame when redirected.</summary>
     public void Show(
         HexEnvironment environment,
         HexFootprint footprint,
@@ -17,59 +18,71 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
         string? outputPath = null,
         int iteration = 0)
     {
-        var heatmap = new HexHeatmap(environment, footprint);
-        var camera = new MapCamera(footprint);
-        var details = SimulationFrameRenderer.DrawDetails(simulationName, outputPath);
-        Func<bool, Panel> drawFrame = interactive => SimulationFrameRenderer.Draw(
-            environment, footprint, heatmap, camera, details, iteration, GetLayout(interactive));
-
-        if (Console.IsInputRedirected || Console.IsOutputRedirected || !console.Profile.Capabilities.Interactive)
+        var profile = new Profile(System.Environment.GetEnvironmentVariable("PENGSIM_PROFILE") == "1");
+        try
         {
-            console.Write(drawFrame(false));
-            return;
-        }
+            var started = Stopwatch.GetTimestamp();
+            var heatmap = new HexHeatmap(environment, footprint);
+            profile.Startup = Stopwatch.GetTimestamp() - started;
+            var camera = new MapCamera(footprint);
 
-        console.Clear();
-        console.Live(drawFrame(true))
-            .AutoClear(false)
-            .Start(context => RunLive(context, camera, heatmap, () => drawFrame(true)));
-    }
+            string[] Draw(int width, int height, bool ansi = true) =>
+                FrameRenderer.RenderRows(environment, footprint, heatmap, camera,
+                    simulationName, outputPath, iteration, width, height, ansi);
 
-    /// <summary>Refreshes the frame when navigation or a terminal resize changes it.</summary>
-    private void RunLive(LiveDisplayContext context, MapCamera camera, HexHeatmap heatmap, Func<Panel> drawFrame)
-    {
-        var lastState = GetDisplayState(camera);
-        context.Refresh();
-
-        while (true)
-        {
-            if (Console.KeyAvailable && !Navigate(Console.ReadKey(intercept: true), camera, heatmap))
+            if (Console.IsInputRedirected || Console.IsOutputRedirected)
             {
+                foreach (var row in Draw(101, 35, ansi: false))
+                {
+                    Console.WriteLine(row);
+                }
+
                 return;
             }
 
-            var state = GetDisplayState(camera);
-            if (state != lastState)
-            {
-                context.UpdateTarget(drawFrame());
-                context.Refresh();
-                lastState = state;
-            }
+            using var renderer = new TerminalPresenter();
+            renderer.Start();
+            renderer.Present(Draw(Console.WindowWidth, Console.WindowHeight),
+                Console.WindowWidth, Console.WindowHeight);
 
-            Thread.Sleep(InputPollMilliseconds);
+            var last = (camera.Center, camera.Level, Console.WindowWidth, Console.WindowHeight);
+            while (true)
+            {
+                var count = 0;
+                while (count < MaxKeysPerFrame && Console.KeyAvailable)
+                {
+                    if (!Navigate(Console.ReadKey(intercept: true), camera, heatmap))
+                    {
+                        return;
+                    }
+
+                    count++;
+                }
+
+                var state = (camera.Center, camera.Level, Console.WindowWidth, Console.WindowHeight);
+                if (state != last)
+                {
+                    started = Stopwatch.GetTimestamp();
+                    var rows = Draw(state.Item3, state.Item4);
+                    var ready = Stopwatch.GetTimestamp();
+                    renderer.Present(rows, state.Item3, state.Item4);
+                    profile.Record(ready - started, Stopwatch.GetTimestamp() - ready);
+                    last = state;
+                }
+
+                if (count == 0)
+                {
+                    Thread.Sleep(InputPollMilliseconds);
+                }
+            }
+        }
+        finally
+        {
+            profile.Save();
         }
     }
 
-    /// <summary>Captures the camera and terminal values that determine the rendered frame.</summary>
-    private (HexCell Center, int? Level, int Width, int Height) GetDisplayState(MapCamera camera) =>
-        (camera.Center, camera.Level, console.Profile.Width, console.Profile.Height);
-
-    /// <summary>Fits the layout to the current console profile.</summary>
-    private TerminalLayout GetLayout(bool interactive) =>
-        TerminalLayout.Fit(console.Profile.Width, console.Profile.Height, interactive);
-
-    /// <summary>Applies a keyboard command and returns whether the session should continue.</summary>
-    private bool Navigate(ConsoleKeyInfo input, MapCamera camera, HexHeatmap heatmap)
+    private static bool Navigate(ConsoleKeyInfo input, MapCamera camera, HexHeatmap heatmap)
     {
         if (input.Key == ConsoleKey.Q)
         {
@@ -90,34 +103,82 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
             _ => (0, 0),
         };
 
-        if (camera.Level.HasValue && (horizontal, vertical) != (0, 0))
+        if (camera.Level is int level && (horizontal, vertical) != (0, 0))
         {
-            var overview = GetLayout(interactive: true).FitOverview(heatmap);
-
-            // A one-cell minimap has no neighbors, so it uses base-cell steps.
-            if (input.Modifiers.HasFlag(ConsoleModifiers.Shift) || overview.Region.Radius == 0)
+            if (input.Modifiers.HasFlag(ConsoleModifiers.Shift))
             {
                 camera.PanFine(horizontal, vertical);
             }
             else
             {
-                camera.Pan(horizontal, vertical, overview.Level, heatmap);
+                camera.Pan(horizontal, vertical, level,
+                    FrameRenderer.PanStride(Console.WindowWidth, Console.WindowHeight));
             }
         }
 
         if (input.KeyChar is '+' or '-')
         {
-            var overviewLevel = GetLayout(interactive: true).FitOverview(heatmap).Level;
+            var overview = FrameRenderer.FitOverview(
+                heatmap, Console.WindowWidth, Console.WindowHeight).Level;
             if (input.KeyChar == '+')
             {
-                camera.ZoomIn(overviewLevel);
+                camera.ZoomIn(overview);
             }
             else
             {
-                camera.ZoomOut(overviewLevel);
+                camera.ZoomOut(overview);
             }
         }
 
         return true;
+    }
+
+    /// <summary>Optional post-exit performance summary.</summary>
+    private sealed class Profile(bool enabled)
+    {
+        private long _prepare;
+        private long _output;
+        private long _slowestOutput;
+        private int _frames;
+
+        public long Startup { get; set; }
+
+        public void Record(long preparation, long output)
+        {
+            if (!enabled) return;
+            _frames++;
+            _prepare += preparation;
+            _output += output;
+            _slowestOutput = Math.Max(_slowestOutput, output);
+        }
+
+        public void Save()
+        {
+            if (!enabled) return;
+
+            var frequency = (double)Stopwatch.Frequency;
+            var frames = Math.Max(1, _frames);
+            string Ms(double ticks) => (ticks * 1000 / frequency).ToString("F2", CultureInfo.InvariantCulture);
+            var content = string.Join("\n",
+                "PengSim performance profile",
+                "Renderer: Direct terminal compositor",
+                $"Recorded frames: {_frames}",
+                $"Initial sparse bucket index: {Ms(Startup)} ms",
+                $"Average frame preparation: {Ms(_prepare / (double)frames)} ms",
+                $"Average output update: {Ms(_output / (double)frames)} ms",
+                $"Slowest output update: {Ms(_slowestOutput)} ms",
+                "");
+
+            var path = System.Environment.GetEnvironmentVariable("PENGSIM_PROFILE_PATH");
+            if (string.IsNullOrWhiteSpace(path)) path = "pengsim-profile.log";
+            try
+            {
+                File.WriteAllText(Path.GetFullPath(path), content);
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException or ArgumentException)
+            {
+                Console.Error.WriteLine($"Could not save profile: {error.Message}");
+            }
+        }
     }
 }

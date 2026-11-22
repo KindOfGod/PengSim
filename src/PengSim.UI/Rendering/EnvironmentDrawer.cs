@@ -10,6 +10,7 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
 {
     private const string Accent = "#5fd7af";
     private const string EmptyCellColor = "#767676";
+    private const string PenguinColor = "#0087d7";
     private const string ViewportBackground = "#303030";
     private static readonly Style PanelBorder = Style.Parse(EmptyCellColor);
     private static readonly Style FrameBorder = Style.Parse("#949494");
@@ -18,11 +19,11 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
     private static readonly (int Maximum, string Color, string Label)[] HeatmapScale =
     [
         (0, EmptyCellColor, "0"),
-        (1, "#0087d7", "1"),
-        (3, "#00afff", "2–3"),
-        (7, "#5fafff", "4–7"),
-        (15, "#87d7ff", "8–15"),
-        (int.MaxValue, "#d7ffff", "16+"),
+        (1, "#ffffaf", "1"),
+        (3, "#ffd787", "2–3"),
+        (7, "#ffaf5f", "4–7"),
+        (15, "#ff875f", "8–15"),
+        (int.MaxValue, "#ff0000", "16+"),
     ];
 
     public void Show(
@@ -112,7 +113,7 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
             }
 
             var (column, row) = footprint.ToOffset(cell);
-            return DensityGlyph(environment[column, row] == HexEnvironment.EmptyCell ? 0 : 1);
+            return environment[column, row] == HexEnvironment.EmptyCell ? DensityGlyph(0) : $"[{PenguinColor}]⬢[/]";
         });
 
         int largestMarker = MarkerRadius(detailRadius, overview.Level - 1, overview.Level, layout.MiniRadius);

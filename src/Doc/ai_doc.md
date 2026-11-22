@@ -104,3 +104,7 @@ Add an entry here when making a change or deciding how the simulation is designe
 
 - Neutral borders group panels. Teal marks the app title, the active iteration frame, and the map outline.
 - The density scale progresses from medium blue to pale ice blue as the population rises. Empty cells stay grey. The minimap viewport keeps its diamond glyph and uses a dark neutral background, leaving its density colors readable.
+
+## 2026-11-22 — Warm density scale
+
+- The heatmap and legend use pale yellow for low nonzero density, orange for middle ranges, and red for the highest density. Empty cells are neutral grey. Individual penguins at L0 remain blue.

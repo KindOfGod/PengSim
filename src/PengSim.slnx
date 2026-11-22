@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="PengSim.BL/PengSim.BL.csproj" />
+  <Project Path="PengSim.UI/PengSim.UI.csproj" />
+</Solution>

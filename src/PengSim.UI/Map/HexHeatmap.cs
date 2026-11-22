@@ -56,6 +56,8 @@ internal sealed class HexHeatmap
 
     public IReadOnlyDictionary<HexCell, int> GetCounts(int level) => _levels[level - 1].Counts;
 
+    public HexRegion GetRegion(int level) => _levels[level - 1].Region;
+
     public (int Level, HexRegion Region) FitWorld(int maxRadius)
     {
         int index = _levels.FindIndex(level => level.Region.Radius <= maxRadius);

@@ -85,3 +85,7 @@ Add an entry here when making a change or deciding how the simulation is designe
 
 - The minimap border fits the projected bounds of the world and active viewport marker. This keeps the map compact and allows the marker to extend beyond the world at the edges.
 - An empty Information panel fills the space below the minimap. The layout reserves at least one content row for it when selecting the shared overview resolution.
+
+## 2026-11-22 — Consistent overview cells
+
+- The main heatmap and minimap show empty cells within the full-world hex as hollow hexagons. The overview displays only hexagon cells. The colored outline and off-map dots are used when zoomed in.

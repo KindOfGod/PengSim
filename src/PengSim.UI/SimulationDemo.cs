@@ -6,10 +6,11 @@ internal sealed class SimulationDemo(ISimulationEngine engine, EnvironmentDrawer
 {
     public void Run()
     {
-        var simulation = engine.CreateSimulation(width: 240, height: 120);
+        var footprint = new HexFootprint(Radius: 80);
+        var simulation = engine.CreateSimulation(footprint.Size, footprint.Size);
         var random = new Random(1024);
         var positions = new HashSet<(int Column, int Row)>();
-        (int Column, int Row)[] clusters = [(35, 32), (85, 83), (120, 60), (162, 30), (204, 85)];
+        (int Column, int Row)[] clusters = [(45, 55), (115, 55), (80, 80), (45, 105), (115, 105)];
 
         foreach (var (column, row) in clusters)
         {
@@ -18,13 +19,15 @@ internal sealed class SimulationDemo(ISimulationEngine engine, EnvironmentDrawer
             {
                 int dx = random.Next(-24, 25);
                 int dy = random.Next(-24, 25);
-                if (dx * dx + dy * dy <= 24 * 24 && positions.Add((column + dx, row + dy)))
+                int x = column + dx;
+                int y = row + dy;
+                if (dx * dx + dy * dy <= 24 * 24 && footprint.Contains(x, y) && positions.Add((x, y)))
                 {
-                    simulation.AddPenguin(column + dx, row + dy);
+                    simulation.AddPenguin(x, y);
                 }
             }
         }
 
-        drawer.Show(simulation.Environment);
+        drawer.Show(simulation.Environment, footprint);
     }
 }

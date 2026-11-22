@@ -4,18 +4,25 @@ namespace PengSim.UI;
 
 internal sealed class HexHeatmap
 {
+    private readonly MapViewport _worldBounds;
     private readonly List<Dictionary<Hex, Coverage>> _levels = [];
 
-    public HexHeatmap(HexEnvironment environment)
+    public HexHeatmap(HexEnvironment environment, HexFootprint footprint)
     {
+        _worldBounds = new MapViewport(0, 0, environment.Width, environment.Height);
         var level = new Dictionary<Hex, Coverage>();
         for (int row = 0; row < environment.Height; row++)
         {
             for (int column = 0; column < environment.Width; column++)
             {
-                int count = environment[column, row] == HexEnvironment.EmptyCell ? 0 : 1;
-                var parent = Hex.FromOffset(column, row).Parent();
-                Add(level, parent, new Coverage(column, row, column, row, count));
+                if (footprint.Contains(column, row))
+                {
+                    int count = environment[column, row] == HexEnvironment.EmptyCell ? 0 : 1;
+                    // Center the parent lattice on the world to preserve its sixfold symmetry.
+                    var (q, r) = footprint.ToAxial(column, row);
+                    var parent = new Hex(q, r).Parent();
+                    Add(level, parent, new Coverage(column, row, column, row, count));
+                }
             }
         }
 
@@ -38,13 +45,32 @@ internal sealed class HexHeatmap
     {
         for (int index = 0; index < _levels.Count; index++)
         {
+            var level = _levels[index];
+            if (viewport == _worldBounds)
+            {
+                // Enclose the stepped parent boundary in a regular hex at this resolution.
+                int radius = level.Keys.Max(hex => HexFootprint.Distance(hex.Q, hex.R));
+                int size = radius * 2 + 1;
+                if (size > maxColumns || size > maxRows)
+                {
+                    continue;
+                }
+
+                return (index + 1, new MapViewport(-radius, -radius, size, size), DrawWorld(level, radius));
+            }
+
             var counts = new Dictionary<(int Column, int Row), int>();
-            foreach (var (hex, coverage) in _levels[index])
+            foreach (var (hex, coverage) in level)
             {
                 if (coverage.Intersects(viewport))
                 {
                     counts.Add(hex.ToOffset(), coverage.Count);
                 }
+            }
+
+            if (counts.Count == 0)
+            {
+                return (index + 1, default, counts);
             }
 
             int left = counts.Keys.Min(cell => cell.Column);
@@ -60,6 +86,23 @@ internal sealed class HexHeatmap
         }
 
         throw new InvalidOperationException("The heatmap requires at least one level.");
+    }
+
+    private static Dictionary<(int Column, int Row), int> DrawWorld(Dictionary<Hex, Coverage> level, int radius)
+    {
+        var counts = new Dictionary<(int Column, int Row), int>();
+        for (int r = -radius; r <= radius; r++)
+        {
+            int minQ = Math.Max(-radius, -r - radius);
+            int maxQ = Math.Min(radius, -r + radius);
+            for (int q = minQ; q <= maxQ; q++)
+            {
+                var hex = new Hex(q, r);
+                counts.Add(hex.ToOffset(), level.TryGetValue(hex, out var coverage) ? coverage.Count : 0);
+            }
+        }
+
+        return counts;
     }
 
     private static void Add(Dictionary<Hex, Coverage> level, Hex hex, Coverage child)
@@ -87,8 +130,6 @@ internal sealed class HexHeatmap
             new(0, 0), new(0, 1), new(1, -1), new(1, 0),
             new(-1, 0), new(-1, 1), new(0, -1),
         ];
-
-        public static Hex FromOffset(int column, int row) => new(column - (row >> 1), row);
 
         public (int Column, int Row) ToOffset() => (Q + (R >> 1), R);
 

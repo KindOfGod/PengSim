@@ -16,17 +16,17 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
         (int.MaxValue, "[red]⬢[/]", "16+"),
     ];
 
-    public void Show(HexEnvironment environment)
+    public void Show(HexEnvironment environment, HexFootprint footprint)
     {
-        var heatmap = new HexHeatmap(environment);
+        var heatmap = new HexHeatmap(environment, footprint);
         var camera = new MapCamera(environment.Width, environment.Height);
         if (Console.IsInputRedirected || Console.IsOutputRedirected || !console.Profile.Capabilities.Interactive)
         {
-            console.Write(Render(environment, heatmap, camera, interactive: false));
+            console.Write(Render(environment, footprint, heatmap, camera, interactive: false));
             return;
         }
 
-        console.Live(Render(environment, heatmap, camera, interactive: true))
+        console.Live(Render(environment, footprint, heatmap, camera, interactive: true))
             .AutoClear(false)
             .Start(context =>
             {
@@ -44,7 +44,7 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
                     var size = (console.Profile.Width, console.Profile.Height);
                     if (bounds != lastBounds || size != lastSize)
                     {
-                        context.UpdateTarget(Render(environment, heatmap, camera, interactive: true));
+                        context.UpdateTarget(Render(environment, footprint, heatmap, camera, interactive: true));
                         context.Refresh();
                         lastBounds = bounds;
                         lastSize = size;
@@ -57,30 +57,30 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
 
     private IRenderable Render(
         HexEnvironment environment,
+        HexFootprint footprint,
         HexHeatmap heatmap,
         MapCamera camera,
         bool interactive)
     {
         int terminalWidth = console.Profile.Width;
-        int terminalHeight = console.Profile.Height;
-        if (terminalHeight <= 0)
-        {
-            terminalHeight = 24;
-        }
-
-        bool showControls = interactive && terminalWidth >= 20 && terminalHeight >= 6;
-        int width = Math.Max(1, terminalWidth - 4);
-        int height = Math.Max(1, terminalHeight - (showControls ? 5 : 2));
+        int terminalHeight = console.Profile.Height > 0 ? console.Profile.Height : 24;
+        var (width, height, showControls) = GetMapArea(terminalWidth, terminalHeight, interactive);
         var bounds = camera.VisibleBounds;
-        bool showHexes = camera.Zoom > 0 && bounds.Width <= width / 2 && bounds.Height <= height;
+        bool showHexes = ShowsDetail(camera, width, height);
         bool showScale = !showHexes && terminalWidth >= HeatmapScale.Length && terminalHeight >= 4;
         string map;
         string title;
         if (showHexes)
         {
-            map = DrawHexes(bounds, (column, row) => environment[column, row] == HexEnvironment.EmptyCell
-                ? "⬡"
-                : "[blue]⬢[/]");
+            map = DrawHexes(bounds, (column, row) =>
+            {
+                if (!footprint.Contains(column, row))
+                {
+                    return " ";
+                }
+
+                return environment[column, row] == HexEnvironment.EmptyCell ? "⬡" : "[blue]⬢[/]";
+            });
             title = "Hex grid · L0";
         }
         else
@@ -92,7 +92,7 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
             title = $"Heatmap · L{view.Level}";
         }
 
-        var panel = new Panel(new Markup(map))
+        var panel = new Panel(new Markup(string.IsNullOrWhiteSpace(map) ? "Outside the playground" : map))
             .Header(title)
             .Border(BoxBorder.Rounded);
 
@@ -146,7 +146,20 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
         return string.Join("\n", rows);
     }
 
-    private static bool Navigate(ConsoleKeyInfo input, MapCamera camera)
+    private static (int Width, int Height, bool ShowControls) GetMapArea(
+        int terminalWidth, int terminalHeight, bool interactive)
+    {
+        bool showControls = interactive && terminalWidth >= 20 && terminalHeight >= 6;
+        return (Math.Max(1, terminalWidth - 4), Math.Max(1, terminalHeight - (showControls ? 5 : 2)), showControls);
+    }
+
+    private static bool ShowsDetail(MapCamera camera, int width, int height)
+    {
+        var bounds = camera.VisibleBounds;
+        return camera.Zoom > 0 && bounds.Width <= width / 2 && bounds.Height <= height;
+    }
+
+    private bool Navigate(ConsoleKeyInfo input, MapCamera camera)
     {
         switch (input.Key)
         {
@@ -159,7 +172,11 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
             default:
                 if (input.KeyChar == '+')
                 {
-                    camera.ChangeZoom(1);
+                    var (width, height, _) = GetMapArea(console.Profile.Width, console.Profile.Height, interactive: true);
+                    if (!ShowsDetail(camera, width, height))
+                    {
+                        camera.ChangeZoom(1);
+                    }
                 }
                 else if (input.KeyChar == '-')
                 {

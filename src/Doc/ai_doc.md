@@ -38,3 +38,8 @@ Add an entry here when making a change or deciding how the simulation is designe
 - Each heatmap level groups seven hexes from the preceding level into one parent. The parent contains a center cell and its six neighbors. The grouping is anchored to world coordinates, so panning preserves parent membership and counts.
 - The drawer builds the levels once from the static grid and uses each parent's world bounds to select cells near the viewport. A parent at the edge can include penguins outside the viewport because its count covers the whole parent.
 - A shared staggered-row renderer draws actual and aggregated hexes. The panel title shows L0 for actual cells and L1 or higher for parents. The heatmap scale counts penguins per parent hex.
+
+## 2026-11-22 — Hexagonal playground and zoom limit
+
+- The demo's playable footprint is a radius-80 hex centered in the grid. Placement and rendering use that same footprint. The parent lattice is anchored at the center. The full-world heatmap draws a regular hex that encloses all parents at the chosen resolution. Any extra edge cells represent empty padding.
+- The first view that fits individual cells is the maximum interactive zoom. Zooming in from that L0 view stops, and zooming out and panning remain available.

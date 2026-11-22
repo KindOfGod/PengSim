@@ -1,3 +1,4 @@
+using HexCell = PengSim.BL.Model.HexCell;
 namespace PengSim.UI.Map;
 
 /// <summary>

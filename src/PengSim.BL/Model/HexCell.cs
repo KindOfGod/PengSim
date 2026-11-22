@@ -1,9 +1,11 @@
-namespace PengSim.UI.Map;
+namespace PengSim.BL.Model;
 
 /// <summary>An axial coordinate in a base or aggregate hex lattice.</summary>
-internal readonly record struct HexCell(int Q, int R)
+public readonly record struct HexCell(int Q, int R)
 {
-    /// <summary>Returns the number of hex steps between two cells on the same level.</summary>
+    public static HexCell FromOffset(int column, int row) => new(column - (row >> 1), row);
+
+    /// <summary>Returns the number of hex steps between two cells.</summary>
     public int DistanceTo(HexCell other)
     {
         var q = Q - other.Q;

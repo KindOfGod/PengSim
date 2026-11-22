@@ -1,54 +1,56 @@
+using System.Diagnostics;
 using PengSim.BL.Contracts;
-using PengSim.BL.Model;
 using PengSim.UI.Map;
 using PengSim.UI.Rendering;
-using HexEnvironment = PengSim.BL.Model.Environment;
 
 namespace PengSim.UI.Demo;
 
-/// <summary>Builds the repeatable snapshot used by the console demo.</summary>
 internal sealed class SimulationDemo(ISimulationEngine engine, EnvironmentDrawer drawer)
 {
-    /// <summary>Creates the demo simulation and opens its console view.</summary>
+    private const int Steps = 1000;
+    private const int Population = 5000;
+
     public void Run()
     {
-        var footprint = new HexFootprint(Radius: 80);
-        var simulation = engine.CreateSimulation(footprint.Size, footprint.Size);
-
-        PopulateClusters(simulation, footprint);
-
-        drawer.Show(simulation.Environment, footprint, simulationName: "Penguin colonies demo");
-    }
-
-    /// <summary>Places 5,000 penguins in five clusters using the same seed on every run.</summary>
-    private static void PopulateClusters(Simulation simulation, HexFootprint footprint)
-    {
-        const int seed = 1024;
-        const int penguinsPerCluster = 1000;
-        const int clusterRadius = 24;
-
-        var random = new Random(seed);
-        (int Column, int Row)[] clusters = [(45, 55), (115, 55), (80, 80), (45, 105), (115, 105)];
-
-        foreach (var (column, row) in clusters)
+        var interactive = !Console.IsInputRedirected && !Console.IsOutputRedirected;
+        if (interactive)
         {
-            var targetCount = simulation.Penguins.Count + penguinsPerCluster;
-
-            // A sample only counts when it is inside the cluster and occupies a new playable cell.
-            while (simulation.Penguins.Count < targetCount)
+            Console.WriteLine("PengSim\n\n1  Create simulation (coming soon)\n2  Run demo\nQ  Quit");
+            while (true)
             {
-                var dx = random.Next(-clusterRadius, clusterRadius + 1);
-                var dy = random.Next(-clusterRadius, clusterRadius + 1);
-                var x = column + dx;
-                var y = row + dy;
-
-                if (dx * dx + dy * dy <= clusterRadius * clusterRadius
-                    && footprint.Contains(x, y)
-                    && simulation.Environment[x, y] == HexEnvironment.EmptyCell)
-                {
-                    simulation.AddPenguin(x, y);
-                }
+                var key = Console.ReadKey(intercept: true);
+                if (key.Key == ConsoleKey.Q) return;
+                if (key.KeyChar == '2') break;
             }
         }
+
+        var footprint = new HexFootprint(Radius: 100);
+        var simulation = engine.CreateSimulation(footprint.Size, footprint.Size);
+        var cells = footprint.Region.Cells().ToArray();
+        Random.Shared.Shuffle(cells);
+        foreach (var cell in cells.Take(Population))
+        {
+            var (column, row) = footprint.ToOffset(cell);
+            simulation.AddPenguin(column, row);
+        }
+
+        var clock = Stopwatch.StartNew();
+        var nextUpdate = TimeSpan.Zero;
+        if (interactive) Console.WriteLine("\nCalculating demo");
+        for (var step = 1; step <= Steps; step++)
+        {
+            simulation.Step();
+            var elapsed = clock.Elapsed;
+            if (interactive && (elapsed >= nextUpdate || step == Steps))
+            {
+                var filled = 20 * step / Steps;
+                Console.Write($"\r[{new string('#', filled)}{new string('-', 20 - filled)}] "
+                    + $"{step,4}/{Steps}  {step / elapsed.TotalSeconds,7:F1} iterations/s");
+                nextUpdate = elapsed + TimeSpan.FromMilliseconds(100);
+            }
+        }
+
+        if (interactive) Console.WriteLine();
+        drawer.Show(simulation.Frames, footprint, "Penguin demo");
     }
 }

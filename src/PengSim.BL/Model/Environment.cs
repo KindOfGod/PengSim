@@ -17,6 +17,10 @@ public sealed class Environment
         _cells = new int[height, width];
     }
 
+    private Environment(Environment previous) => _cells = (int[,])previous._cells.Clone();
+
+    internal Environment Copy() => new(this);
+
     /// <summary>Gets the number of columns.</summary>
     public int Width => _cells.GetLength(1);
 

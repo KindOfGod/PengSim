@@ -1,3 +1,4 @@
+using HexCell = PengSim.BL.Model.HexCell;
 using PengSim.UI.Map;
 using HexEnvironment = PengSim.BL.Model.Environment;
 
@@ -24,8 +25,9 @@ internal static class FrameRenderer
         HexHeatmap heatmap,
         MapCamera camera,
         string simulationName,
-        string? outputPath,
         int iteration,
+        int lastIteration,
+        int speed,
         FrameLayout layout,
         bool ansi = true)
     {
@@ -38,13 +40,13 @@ internal static class FrameRenderer
         screen.Box(0, 0, layout.Width, layout.Height, "Penguin Simulation", OuterColor);
         screen.Text(2, 1, "Name: " + simulationName,
             HeatmapPalette.DefaultColor, layout.Width - 4);
-        screen.Text(2, 2, "Path: " + (outputPath ?? "Unsaved"),
+        screen.Text(2, 2, speed == 0 ? "Paused" : $"Playing at {speed} fps",
             HeatmapPalette.DefaultColor, layout.Width - 4);
 
         var iterationPanel = layout.Iteration;
         screen.Box(iterationPanel.X, iterationPanel.Y,
             iterationPanel.Width, iterationPanel.Height,
-            $"Iteration {iteration}", AccentColor);
+            $"Iteration {iteration}/{lastIteration}", AccentColor);
 
         var overview = layout.FitOverview(heatmap);
         var level = camera.Level ?? overview.Level;
@@ -84,7 +86,7 @@ internal static class FrameRenderer
         screen.Text(layout.Map.X, legendY + 1,
             position, HeatmapPalette.DefaultColor, layout.Map.Width);
         screen.Text(2, layout.Height - 2,
-            "Arrows/WASD pan   Shift+arrows fine   +/- zoom   R reset   Q quit",
+            "WASD pan  Shift+WASD fine  +/- zoom  ←/→ step  0 pause  1-9 fps  R reset  Q quit",
             HeatmapPalette.DefaultColor, layout.Width - 4);
 
         return screen.ToAnsiRows(ansi);

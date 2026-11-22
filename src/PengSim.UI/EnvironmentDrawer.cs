@@ -7,6 +7,16 @@ namespace PengSim.UI;
 
 internal sealed class EnvironmentDrawer(IAnsiConsole console)
 {
+    private static readonly (int Maximum, string Dot, string Label)[] HeatmapScale =
+    [
+        (0, "[grey]·[/]", "0"),
+        (1, "[blue]●[/]", "1"),
+        (3, "[aqua]●[/]", "2–3"),
+        (7, "[green]●[/]", "4–7"),
+        (15, "[yellow]●[/]", "8–15"),
+        (int.MaxValue, "[red]●[/]", "16+"),
+    ];
+
     public void Show(HexEnvironment environment, IReadOnlyCollection<(int Column, int Row)> penguins)
     {
         var camera = new MapCamera(environment.Width, environment.Height);
@@ -51,29 +61,52 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
         MapCamera camera,
         bool interactive)
     {
-        int width = Math.Max(1, console.Profile.Width - 4);
-        int height = Math.Max(1, console.Profile.Height - (interactive ? 5 : 2));
+        int terminalWidth = console.Profile.Width;
+        int terminalHeight = console.Profile.Height;
+        bool showControls = interactive && terminalWidth >= 20 && terminalHeight >= 6;
+        int width = Math.Max(1, terminalWidth - 4);
+        int height = Math.Max(1, terminalHeight - (showControls ? 5 : 2));
         var bounds = camera.VisibleBounds;
         bool showHexes = camera.Zoom > 0 && bounds.Width <= width / 2 && bounds.Height <= height;
+        bool showScale = !showHexes && terminalWidth >= HeatmapScale.Length && terminalHeight >= 4;
         string map = showHexes
             ? DrawHexes(environment, bounds)
-            : DrawHeatmap(penguins, bounds, width, height);
+            : DrawHeatmap(penguins, bounds, width, Math.Max(1, height - (showScale ? 1 : 0)));
 
         var panel = new Panel(new Markup(map))
             .Header(showHexes ? "Hex grid" : "Heatmap")
             .Border(BoxBorder.Rounded);
 
-        if (!interactive || console.Profile.Width < 20 || console.Profile.Height < 6)
+        var content = new List<IRenderable> { panel };
+        if (showScale)
         {
-            return panel;
+            content.Add(new Markup(DrawScale(terminalWidth)));
         }
 
-        string controls = console.Profile.Width >= 42
-            ? "Arrows/WASD pan  +/- zoom  R reset  Q quit"
-            : "WASD +/- R Q";
-        string status = $"x{Math.Pow(2, camera.Zoom):0}  {bounds.Width}×{bounds.Height}  ({bounds.Left},{bounds.Top})";
+        if (showControls)
+        {
+            string controls = terminalWidth >= 42
+                ? "Arrows/WASD pan  +/- zoom  R reset  Q quit"
+                : "WASD +/- R Q";
+            string status = $"x{Math.Pow(2, camera.Zoom):0}  {bounds.Width}×{bounds.Height}  ({bounds.Left},{bounds.Top})";
+            content.Add(new Text(status));
+            content.Add(new Text(controls));
+        }
 
-        return new Rows(panel, new Text(status), new Text(controls));
+        return new Rows(content);
+    }
+
+    private static string DrawScale(int width)
+    {
+        string fullScale = "Penguins per bucket  "
+            + string.Join("  ", HeatmapScale.Select(band => $"{band.Dot} {band.Label}"));
+        if (width >= Markup.Remove(fullScale).Length)
+        {
+            return fullScale;
+        }
+
+        string dots = string.Concat(HeatmapScale.Select(band => band.Dot));
+        return width >= 12 ? $"0 {dots} 16+" : dots;
     }
 
     private static string DrawHexes(HexEnvironment environment, MapViewport bounds)
@@ -130,15 +163,14 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
 
             for (int x = 0; x < columns; x++)
             {
-                markup.Append(counts[y, x] switch
+                foreach (var band in HeatmapScale)
                 {
-                    0 => "[grey].[/]",
-                    1 => "[blue]:[/]",
-                    <= 3 => "[aqua]-[/]",
-                    <= 7 => "[green]+[/]",
-                    <= 15 => "[yellow]*[/]",
-                    _ => "[red]#[/]",
-                });
+                    if (counts[y, x] <= band.Maximum)
+                    {
+                        markup.Append(band.Dot);
+                        break;
+                    }
+                }
             }
         }
 

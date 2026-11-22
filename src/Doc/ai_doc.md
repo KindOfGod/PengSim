@@ -88,4 +88,4 @@ Add an entry here when making a change or deciding how the simulation is designe
 
 ## 2026-11-22 — Consistent overview cells
 
-- The main heatmap and minimap show empty cells within the full-world hex as hollow hexagons. The overview displays only hexagon cells. The colored outline and off-map dots are used when zoomed in.
+- The main heatmap and minimap show empty cells within the full-world hex as hollow hexagons. The overview displays hollow and filled hexagons inside a purple outline. Grey off-map dots are used only when zoomed in.

@@ -76,14 +76,13 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
         var drawRegion = view with { Radius = layout.MainRadius };
         var counts = level > 0 ? heatmap.GetCounts(level) : null;
         var worldAtLevel = level > 0 ? heatmap.GetRegion(level) : footprint.Region;
-        bool zoomedIn = camera.Level.HasValue;
 
         var main = DrawPanel(level == 0 ? "Hex grid · L0" : $"Heatmap · L{level}", drawRegion, layout.MainWidth, cell =>
         {
             int distance = cell.DistanceTo(view.Center);
             if (distance > view.Radius)
             {
-                return zoomedIn && distance == view.Radius + 1 ? "[fuchsia]·[/]" : " ";
+                return distance == view.Radius + 1 ? "[fuchsia]·[/]" : " ";
             }
 
             if (counts is not null)

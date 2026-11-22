@@ -6,12 +6,25 @@ internal sealed class SimulationDemo(ISimulationEngine engine, EnvironmentDrawer
 {
     public void Run()
     {
-        var simulation = engine.CreateSimulation(width: 5, height: 5);
-        simulation.AddPenguin(column: 2, row: 0);
-        simulation.AddPenguin(column: 1, row: 1);
-        simulation.AddPenguin(column: 2, row: 2);
-        simulation.AddPenguin(column: 2, row: 3);
+        var simulation = engine.CreateSimulation(width: 240, height: 120);
+        var random = new Random(1024);
+        var positions = new HashSet<(int Column, int Row)>();
+        (int Column, int Row)[] clusters = [(35, 32), (85, 83), (120, 60), (162, 30), (204, 85)];
 
-        drawer.Draw(simulation.Environment);
+        foreach (var (column, row) in clusters)
+        {
+            int targetCount = positions.Count + 1000;
+            while (positions.Count < targetCount)
+            {
+                int dx = random.Next(-24, 25);
+                int dy = random.Next(-24, 25);
+                if (dx * dx + dy * dy <= 24 * 24 && positions.Add((column + dx, row + dy)))
+                {
+                    simulation.AddPenguin(column + dx, row + dy);
+                }
+            }
+        }
+
+        drawer.Show(simulation.Environment, positions);
     }
 }

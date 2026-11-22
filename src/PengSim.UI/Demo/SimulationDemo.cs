@@ -1,6 +1,8 @@
 using PengSim.BL.Contracts;
+using PengSim.UI.Map;
+using PengSim.UI.Rendering;
 
-namespace PengSim.UI;
+namespace PengSim.UI.Demo;
 
 internal sealed class SimulationDemo(ISimulationEngine engine, EnvironmentDrawer drawer)
 {

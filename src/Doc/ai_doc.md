@@ -70,3 +70,8 @@ Add an entry here when making a change or deciding how the simulation is designe
 ## 2026-11-22 — Precomputed map hierarchy
 
 - Startup builds the full parent hierarchy, including density, base-cell membership, a bounds check, and a playable landing point for every parent. The full-world overview reuses the stored levels directly. Panning and zooming query the stored membership and counts.
+
+## 2026-11-22 — Stable map layout and UI folders
+
+- Both panels stay visible at every zoom level. The main panel uses the largest hex that fits the available rows and columns. Zooming switches between stored aggregation levels while the panel size stays fixed. A magenta ring distinguishes the map outline from grey off-map cells.
+- The UI keeps coordinates, the camera, and aggregation in `Map`, terminal drawing in `Rendering`, and sample data in `Demo`. `Program` wires them together at the project root.

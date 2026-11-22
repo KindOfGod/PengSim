@@ -1,4 +1,4 @@
-namespace PengSim.UI;
+namespace PengSim.UI.Map;
 
 internal readonly record struct HexCell(int Q, int R)
 {

@@ -1,5 +1,7 @@
 using Autofac;
 using PengSim.BL;
+using PengSim.UI.Demo;
+using PengSim.UI.Rendering;
 using Spectre.Console;
 
 namespace PengSim.UI;

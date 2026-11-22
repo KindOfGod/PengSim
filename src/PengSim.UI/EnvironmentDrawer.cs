@@ -100,9 +100,9 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
             if (layout.SideBySide)
             {
                 var grid = new Grid().AddColumns(
-                    new GridColumn { Width = layout.MainWidth, Padding = new Padding(0, 0) },
+                    new GridColumn { Width = main.Width, Padding = new Padding(0, 0) },
                     new GridColumn { Width = 1, Padding = new Padding(0, 0) },
-                    new GridColumn { Width = layout.MiniWidth, Padding = new Padding(0, 0) });
+                    new GridColumn { Width = mini.Width, Padding = new Padding(0, 0) });
                 grid.AddRow(main, new Text(" "), mini);
                 maps = grid;
             }
@@ -137,7 +137,7 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
         return new Rows(content);
     }
 
-    private static Panel DrawPanel(string title, HexRegion region, int width, Func<HexCell, string> glyph)
+    private static Panel DrawPanel(string title, HexRegion region, int maxWidth, Func<HexCell, string> glyph)
     {
         var text = new StringBuilder();
         for (int r = -region.Radius; r <= region.Radius; r++)
@@ -161,6 +161,7 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
             }
         }
 
+        int width = Math.Min(maxWidth, Math.Max(title.Length + 4, 4 * region.Radius + 5));
         return new Panel(new Markup(text.ToString())) { Width = width }
             .Header(title)
             .Border(BoxBorder.Rounded);

@@ -49,3 +49,7 @@ Add an entry here when making a change or deciding how the simulation is designe
 - The camera stores an axial center and hex radius. Each parent view projects the same hex-shaped selection through the aggregation hierarchy, then renders a regular hex around the projected center. Dim dots mark padding or cells outside the playable region.
 - The minimap displays the full world and marks coarse hexes that contain cells from the camera region. On narrow terminals the panels stack. The marker changes at the minimap's displayed cell resolution.
 - The heatmap precomputes counts per parent level. The main map and minimap share the renderer, and panning reuses the aggregated counts.
+
+## 2026-11-22 — Compact map panels
+
+- The terminal size determines how much detail fits. Each panel then sizes its border to the rendered hex and title, so the minimap stays one column away from the main panel even on wide terminals.

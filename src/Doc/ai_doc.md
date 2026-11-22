@@ -43,3 +43,9 @@ Add an entry here when making a change or deciding how the simulation is designe
 
 - The demo's playable footprint is a radius-80 hex centered in the grid. Placement and rendering use that same footprint. The parent lattice is anchored at the center. The full-world heatmap draws a regular hex that encloses all parents at the chosen resolution. Any extra edge cells represent empty padding.
 - The first view that fits individual cells is the maximum interactive zoom. Zooming in from that L0 view stops, and zooming out and panning remain available.
+
+## 2026-11-22 — Hexagonal camera and minimap
+
+- The camera stores an axial center and hex radius. Each parent view projects the same hex-shaped selection through the aggregation hierarchy, then renders a regular hex around the projected center. Dim dots mark padding or cells outside the playable region.
+- The minimap displays the full world and marks coarse hexes that contain cells from the camera region. On narrow terminals the panels stack. The marker changes at the minimap's displayed cell resolution.
+- The heatmap precomputes counts per parent level. The main map and minimap share the renderer, and panning reuses the aggregated counts.

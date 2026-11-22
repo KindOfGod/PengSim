@@ -1,50 +1,48 @@
 namespace PengSim.UI;
 
-internal readonly record struct MapViewport(int Left, int Top, int Width, int Height);
-
-internal sealed class MapCamera(int worldWidth, int worldHeight)
+internal sealed class MapCamera(HexFootprint footprint)
 {
-    private readonly int _maxZoom = (int)Math.Ceiling(Math.Log2(Math.Max(worldWidth, worldHeight)));
+    private HexCell _center;
 
-    public int CenterColumn { get; private set; } = worldWidth / 2;
-    public int CenterRow { get; private set; } = worldHeight / 2;
     public int Zoom { get; private set; }
-
-    public MapViewport VisibleBounds
-    {
-        get
-        {
-            double scale = Math.Pow(2, Zoom);
-            int width = Math.Max(1, (int)Math.Ceiling(worldWidth / scale));
-            int height = Math.Max(1, (int)Math.Ceiling(worldHeight / scale));
-
-            return new MapViewport(
-                Math.Clamp(CenterColumn - width / 2, 0, worldWidth - width),
-                Math.Clamp(CenterRow - height / 2, 0, worldHeight - height),
-                width,
-                height);
-        }
-    }
+    public HexRegion View => new(_center, (int)Math.Round(footprint.Radius / Math.Pow(2, Zoom), MidpointRounding.AwayFromZero));
 
     public void Pan(int horizontal, int vertical)
     {
-        var viewport = VisibleBounds;
-        int left = viewport.Left + horizontal * Math.Max(1, viewport.Width / 4);
-        int top = viewport.Top + vertical * Math.Max(1, viewport.Height / 4);
+        if (Zoom == 0)
+        {
+            return;
+        }
 
-        CenterColumn = Math.Clamp(left, 0, worldWidth - viewport.Width) + viewport.Width / 2;
-        CenterRow = Math.Clamp(top, 0, worldHeight - viewport.Height) + viewport.Height / 2;
+        var (column, row) = footprint.ToOffset(_center);
+        int step = Math.Max(1, View.Radius / 2);
+        for (int i = 0; i < step; i++)
+        {
+            var next = footprint.ToAxial(column + horizontal, row + vertical);
+            if (!footprint.Region.Contains(next))
+            {
+                break;
+            }
+
+            column += horizontal;
+            row += vertical;
+            _center = next;
+        }
     }
 
     public void ChangeZoom(int direction)
     {
-        Zoom = Math.Clamp(Zoom + direction, 0, _maxZoom);
+        int maxZoom = (int)Math.Ceiling(Math.Log2(Math.Max(1, footprint.Radius))) + 1;
+        Zoom = Math.Clamp(Zoom + direction, 0, maxZoom);
+        if (Zoom == 0)
+        {
+            _center = default;
+        }
     }
 
     public void Reset()
     {
-        CenterColumn = worldWidth / 2;
-        CenterRow = worldHeight / 2;
+        _center = default;
         Zoom = 0;
     }
 }

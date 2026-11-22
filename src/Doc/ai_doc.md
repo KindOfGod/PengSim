@@ -80,3 +80,8 @@ Add an entry here when making a change or deciding how the simulation is designe
 
 - The minimap has more room, especially on wide terminals. Both panels use the finest full-world aggregation level that fits them. The minimap keeps that level while the main map zooms in.
 - When space is tight, the viewport marker uses the room around the overview. The full-world heatmap and the marker's hex shape stay visible at the edges.
+
+## 2026-11-22 — Compact minimap and Information panel
+
+- The minimap border fits the projected bounds of the world and active viewport marker. This keeps the map compact and allows the marker to extend beyond the world at the edges.
+- An empty Information panel fills the space below the minimap. The layout reserves at least one content row for it when selecting the shared overview resolution.

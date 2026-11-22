@@ -103,7 +103,12 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
         var miniCounts = heatmap.GetCounts(overview.Level);
         int markerRadius = MarkerRadius(detailRadius, level, overview.Level, margin);
         var marker = new HexRegion(camera.Center.Ancestor(overview.Level), markerRadius);
-        var miniBounds = overview.Region with { Radius = overview.Region.Radius + margin };
+        var miniBounds = MapBounds.FromHex(overview.Region);
+        if (camera.Level.HasValue)
+        {
+            miniBounds = miniBounds.Union(MapBounds.FromHex(marker));
+        }
+
         var mini = DrawPanel($"Minimap · L{overview.Level}", miniBounds, layout.MiniWidth, cell =>
         {
             if (camera.Level.HasValue && marker.Contains(cell))
@@ -114,6 +119,13 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
             return overview.Region.Contains(cell) ? DensityGlyph(miniCounts.GetValueOrDefault(cell)) : " ";
         });
 
+        int informationRows = Math.Max(1, layout.SideHeight - (miniBounds.Height + 2) - 2);
+        string emptyInformation = string.Join("\n", Enumerable.Repeat(" ", informationRows));
+        var information = new Panel(new Text(emptyInformation)) { Width = mini.Width }
+            .Header("Information")
+            .Border(BoxBorder.Rounded);
+        var side = new Rows(mini, information);
+
         IRenderable maps;
         if (layout.SideBySide)
         {
@@ -121,12 +133,12 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
                 new GridColumn { Width = main.Width, Padding = new Padding(0, 0) },
                 new GridColumn { Width = 1, Padding = new Padding(0, 0) },
                 new GridColumn { Width = mini.Width, Padding = new Padding(0, 0) });
-            grid.AddRow(main, new Text(" "), mini);
+            grid.AddRow(main, new Text(" "), side);
             maps = grid;
         }
         else
         {
-            maps = new Rows(main, mini);
+            maps = new Rows(main, side);
         }
 
         var content = new List<IRenderable> { maps };
@@ -154,31 +166,26 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
         return new Rows(content);
     }
 
-    private static Panel DrawPanel(string title, HexRegion region, int maxWidth, Func<HexCell, string> glyph)
+    private static Panel DrawPanel(string title, HexRegion region, int maxWidth, Func<HexCell, string> glyph) =>
+        DrawPanel(title, MapBounds.FromHex(region), maxWidth, cell => region.Contains(cell) ? glyph(cell) : " ");
+
+    private static Panel DrawPanel(string title, MapBounds bounds, int maxWidth, Func<HexCell, string> glyph)
     {
         var text = new StringBuilder();
-        for (int r = -region.Radius; r <= region.Radius; r++)
+        for (int row = bounds.Top; row <= bounds.Bottom; row++)
         {
-            if (r > -region.Radius)
+            if (row > bounds.Top)
             {
                 text.Append('\n');
             }
 
-            text.Append(' ', Math.Abs(r));
-            int firstQ = Math.Max(-region.Radius, -r - region.Radius);
-            int lastQ = Math.Min(region.Radius, -r + region.Radius);
-            for (int q = firstQ; q <= lastQ; q++)
+            for (int x = bounds.Left; x <= bounds.Right; x++)
             {
-                if (q > firstQ)
-                {
-                    text.Append(' ');
-                }
-
-                text.Append(glyph(new HexCell(region.Center.Q + q, region.Center.R + r)));
+                text.Append(((x - row) & 1) == 0 ? glyph(new HexCell((x - row) / 2, row)) : " ");
             }
         }
 
-        int width = Math.Min(maxWidth, Math.Max(title.Length + 4, 4 * region.Radius + 5));
+        int width = Math.Min(maxWidth, Math.Max(title.Length + 4, bounds.Width + 4));
         return new Panel(new Markup(text.ToString())) { Width = width }
             .Header(title)
             .Border(BoxBorder.Rounded);
@@ -208,16 +215,16 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
         int width = console.Profile.Width;
         int height = console.Profile.Height > 0 ? console.Profile.Height : 24;
         bool sideBySide = width >= 38;
-        bool showControls = interactive && width >= 26 && height >= (sideBySide ? 7 : 11);
-        bool showScale = width >= 6 && height >= (sideBySide ? 5 : 9);
+        bool showControls = interactive && width >= 26 && height >= (sideBySide ? 9 : 14);
+        bool showScale = width >= 6 && height >= (sideBySide ? 7 : 11);
         int mapHeight = height - (showControls ? 2 : 0) - (showScale ? 1 : 0);
         int miniWidth = sideBySide ? width * 48 / 100 : width;
-        int miniHeight = sideBySide ? mapHeight : Math.Max(3, (mapHeight - 2) / 2);
+        int sideHeight = sideBySide ? mapHeight : Math.Max(6, mapHeight / 2);
         int mainWidth = sideBySide ? width - miniWidth - 1 : width;
-        int mainHeight = sideBySide ? mapHeight : mapHeight - miniHeight;
+        int mainHeight = sideBySide ? mapHeight : mapHeight - sideHeight;
 
         return new Layout(mainWidth, FittingRadius(mainWidth, mainHeight),
-            miniWidth, FittingRadius(miniWidth, miniHeight), sideBySide, showControls, showScale);
+            miniWidth, FittingRadius(miniWidth, sideHeight - 3), sideHeight, sideBySide, showControls, showScale);
     }
 
     private static int FittingRadius(int width, int height) =>
@@ -279,7 +286,25 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
         return true;
     }
 
+    // The projected x coordinate uses half-column spacing between adjacent hex rows.
+    private readonly record struct MapBounds(int Left, int Top, int Right, int Bottom)
+    {
+        public int Width => Right - Left + 1;
+        public int Height => Bottom - Top + 1;
+
+        public static MapBounds FromHex(HexRegion hex)
+        {
+            int x = 2 * hex.Center.Q + hex.Center.R;
+            int r = hex.Radius;
+            return new(x - 2 * r, hex.Center.R - r, x + 2 * r, hex.Center.R + r);
+        }
+
+        public MapBounds Union(MapBounds other) =>
+            new(Math.Min(Left, other.Left), Math.Min(Top, other.Top),
+                Math.Max(Right, other.Right), Math.Max(Bottom, other.Bottom));
+    }
+
     private readonly record struct Layout(
-        int MainWidth, int MainRadius, int MiniWidth, int MiniRadius,
+        int MainWidth, int MainRadius, int MiniWidth, int MiniRadius, int SideHeight,
         bool SideBySide, bool ShowControls, bool ShowScale);
 }

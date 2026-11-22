@@ -60,7 +60,12 @@ internal sealed class EnvironmentDrawer
             while (count < MaxKeysPerFrame && Console.KeyAvailable)
             {
                 var input = Console.ReadKey(intercept: true);
-                if (input.Key is ConsoleKey.LeftArrow or ConsoleKey.RightArrow)
+                if (input.Key == ConsoleKey.Home)
+                {
+                    iteration = 0;
+                    speed = 0;
+                }
+                else if (input.Key is ConsoleKey.LeftArrow or ConsoleKey.RightArrow)
                 {
                     speed = 0;
                     iteration = Math.Clamp(iteration + (input.Key == ConsoleKey.LeftArrow ? -1 : 1),

@@ -86,7 +86,7 @@ internal static class FrameRenderer
         screen.Text(layout.Map.X, legendY + 1,
             position, HeatmapPalette.DefaultColor, layout.Map.Width);
         screen.Text(2, layout.Height - 2,
-            "WASD pan  Shift+WASD fine  +/- zoom  ←/→ step  0 pause  1-9 fps  R reset  Q quit",
+            "WASD pan  Shift+WASD fine  +/- zoom  ←/→ step  Home start  0 pause  1-9 fps  R reset  Q quit",
             HeatmapPalette.DefaultColor, layout.Width - 4);
 
         return screen.ToAnsiRows(ansi);

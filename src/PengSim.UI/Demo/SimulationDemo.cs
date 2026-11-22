@@ -24,7 +24,7 @@ internal sealed class SimulationDemo(ISimulationEngine engine, EnvironmentDrawer
             }
         }
 
-        var footprint = new HexFootprint(Radius: 100);
+        var footprint = new HexFootprint(Radius: 150);
         var simulation = engine.CreateSimulation(footprint.Size, footprint.Size);
         var cells = footprint.Region.Cells().ToArray();
         Random.Shared.Shuffle(cells);

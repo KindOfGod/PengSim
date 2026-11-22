@@ -117,3 +117,8 @@ Add an entry here when making a change or deciding how the simulation is designe
 
 - The heatmap has nine occupied density bands plus grey for empty cells. The first four bands distinguish small groups of one to seven penguins. The larger ranges extend to 128 or more so dense clusters remain distinguishable in the overview.
 - Counts use the same scale across the heatmap, minimap, and legend. The compact legend gets its endpoints from the density bands.
+
+## 2026-11-22 — Readability refactor
+
+- The console session handles input and redraws. Separate rendering code composes the frames, draws the map panels, fits them to the terminal, and defines the palette.
+- The hierarchy builder separates base-cell grouping, parent aggregation, and cached level data. XML summaries document the simulation and UI methods. The console output, navigation, demo data, and simulation behavior are preserved.

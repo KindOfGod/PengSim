@@ -1,280 +1,74 @@
-using System.Text;
 using PengSim.UI.Map;
 using Spectre.Console;
-using Spectre.Console.Rendering;
 using HexEnvironment = PengSim.BL.Model.Environment;
 
 namespace PengSim.UI.Rendering;
 
+/// <summary>Runs a console session for one simulation snapshot.</summary>
 internal sealed class EnvironmentDrawer(IAnsiConsole console)
 {
-    private const string Accent = "#5fd7af";
-    private const string EmptyCellColor = "#767676";
-    private const string PenguinColor = "#0087d7";
-    private const string ViewportBackground = "#303030";
-    private static readonly Style PanelBorder = Style.Parse(EmptyCellColor);
-    private static readonly Style FrameBorder = Style.Parse("#949494");
-    private static readonly Style ActiveBorder = Style.Parse(Accent);
+    private const int InputPollMilliseconds = 30;
 
-    private static readonly (int Maximum, string Color, string Label)[] HeatmapScale =
-    [
-        (0, EmptyCellColor, "0"),
-        (1, PenguinColor, "1"),
-        (2, "#5f87d7", "2"),
-        (4, "#5f5fd7", "3–4"),
-        (7, "#875fd7", "5–7"),
-        (15, "#af5faf", "8–15"),
-        (31, "#d75faf", "16–31"),
-        (63, "#d75f87", "32–63"),
-        (127, "#d75f5f", "64–127"),
-        (int.MaxValue, "#ff0000", "128+"),
-    ];
-
+    /// <summary>Shows the live map in a terminal or prints one frame when redirected.</summary>
     public void Show(
-        HexEnvironment environment, HexFootprint footprint, string simulationName,
-        string? outputPath = null, int iteration = 0)
+        HexEnvironment environment,
+        HexFootprint footprint,
+        string simulationName,
+        string? outputPath = null,
+        int iteration = 0)
     {
         var heatmap = new HexHeatmap(environment, footprint);
         var camera = new MapCamera(footprint);
-        var details = new Rows(
-            new Markup($"[bold]{Emoji.Known.Penguin}  Name:[/] {Markup.Escape(simulationName)}")
-                { Overflow = Overflow.Ellipsis },
-            new Markup($"[bold]{Emoji.Known.FileFolder}  Path:[/] {Markup.Escape(outputPath ?? "Unsaved")}")
-                { Overflow = Overflow.Ellipsis });
+        var details = SimulationFrameRenderer.DrawDetails(simulationName, outputPath);
+        Func<bool, Panel> drawFrame = interactive => SimulationFrameRenderer.Draw(
+            environment, footprint, heatmap, camera, details, iteration, GetLayout(interactive));
+
         if (Console.IsInputRedirected || Console.IsOutputRedirected || !console.Profile.Capabilities.Interactive)
         {
-            console.Write(Render(environment, footprint, heatmap, camera, details, iteration, interactive: false));
+            console.Write(drawFrame(false));
             return;
         }
 
         console.Clear();
-        console.Live(Render(environment, footprint, heatmap, camera, details, iteration, interactive: true))
+        console.Live(drawFrame(true))
             .AutoClear(false)
-            .Start(context =>
+            .Start(context => RunLive(context, camera, heatmap, () => drawFrame(true)));
+    }
+
+    /// <summary>Refreshes the frame when navigation or a terminal resize changes it.</summary>
+    private void RunLive(LiveDisplayContext context, MapCamera camera, HexHeatmap heatmap, Func<Panel> drawFrame)
+    {
+        var lastState = GetDisplayState(camera);
+        context.Refresh();
+
+        while (true)
+        {
+            if (Console.KeyAvailable && !Navigate(Console.ReadKey(intercept: true), camera, heatmap))
             {
-                var lastCenter = camera.Center;
-                int? lastLevel = camera.Level;
-                var lastSize = (console.Profile.Width, console.Profile.Height);
+                return;
+            }
+
+            var state = GetDisplayState(camera);
+            if (state != lastState)
+            {
+                context.UpdateTarget(drawFrame());
                 context.Refresh();
-                while (true)
-                {
-                    if (Console.KeyAvailable && !Navigate(Console.ReadKey(intercept: true), camera, heatmap))
-                    {
-                        return;
-                    }
+                lastState = state;
+            }
 
-                    var size = (console.Profile.Width, console.Profile.Height);
-                    if (camera.Center != lastCenter || camera.Level != lastLevel || size != lastSize)
-                    {
-                        context.UpdateTarget(Render(environment, footprint, heatmap, camera, details, iteration, interactive: true));
-                        context.Refresh();
-                        lastCenter = camera.Center;
-                        lastLevel = camera.Level;
-                        lastSize = size;
-                    }
-
-                    Thread.Sleep(30);
-                }
-            });
+            Thread.Sleep(InputPollMilliseconds);
+        }
     }
 
-    private IRenderable Render(
-        HexEnvironment environment,
-        HexFootprint footprint,
-        HexHeatmap heatmap,
-        MapCamera camera,
-        Rows details,
-        int iteration,
-        bool interactive)
-    {
-        var layout = GetLayout(interactive);
-        int detailRadius = Math.Max(0, layout.MainRadius - 1);
-        var overview = FitOverview(heatmap, layout);
-        int level = camera.Level ?? overview.Level;
-        var view = camera.Level.HasValue
-            ? new HexRegion(camera.Center.Ancestor(level), detailRadius)
-            : overview.Region;
-        var drawRegion = view with { Radius = layout.MainRadius };
-        var counts = level > 0 ? heatmap.GetCounts(level) : null;
-        var worldAtLevel = level > 0 ? heatmap.GetRegion(level) : footprint.Region;
+    /// <summary>Captures the camera and terminal values that determine the rendered frame.</summary>
+    private (HexCell Center, int? Level, int Width, int Height) GetDisplayState(MapCamera camera) =>
+        (camera.Center, camera.Level, console.Profile.Width, console.Profile.Height);
 
-        var main = DrawPanel(level == 0 ? "Hex grid · L0" : $"Heatmap · L{level}", drawRegion, layout.MainWidth, cell =>
-        {
-            int distance = cell.DistanceTo(view.Center);
-            if (distance > view.Radius)
-            {
-                return distance == view.Radius + 1 ? $"[{Accent}]·[/]" : " ";
-            }
+    /// <summary>Fits the layout to the current console profile.</summary>
+    private TerminalLayout GetLayout(bool interactive) =>
+        TerminalLayout.Fit(console.Profile.Width, console.Profile.Height, interactive);
 
-            if (counts is not null)
-            {
-                return worldAtLevel.Contains(cell) ? DensityGlyph(counts.GetValueOrDefault(cell)) : $"[{EmptyCellColor}]·[/]";
-            }
-
-            if (!worldAtLevel.Contains(cell))
-            {
-                return $"[{EmptyCellColor}]·[/]";
-            }
-
-            var (column, row) = footprint.ToOffset(cell);
-            return environment[column, row] == HexEnvironment.EmptyCell ? DensityGlyph(0) : $"[{PenguinColor}]⬢[/]";
-        });
-
-        int largestMarker = MarkerRadius(detailRadius, overview.Level - 1, overview.Level, layout.MiniRadius);
-        int margin = Math.Min(largestMarker, layout.MiniRadius - overview.Region.Radius);
-        var miniCounts = heatmap.GetCounts(overview.Level);
-        int markerRadius = MarkerRadius(detailRadius, level, overview.Level, margin);
-        var marker = new HexRegion(camera.Center.Ancestor(overview.Level), markerRadius);
-        var miniBounds = MapBounds.FromHex(overview.Region);
-        if (camera.Level.HasValue)
-        {
-            miniBounds = miniBounds.Union(MapBounds.FromHex(marker));
-        }
-
-        var mini = DrawPanel($"Minimap · L{overview.Level}", miniBounds, layout.MiniWidth, cell =>
-        {
-            if (camera.Level.HasValue && marker.Contains(cell))
-            {
-                return DensityGlyph(miniCounts.GetValueOrDefault(cell), highlighted: true);
-            }
-
-            return overview.Region.Contains(cell) ? DensityGlyph(miniCounts.GetValueOrDefault(cell)) : " ";
-        });
-
-        int informationRows = Math.Max(1, layout.SideHeight - (miniBounds.Height + 2) - 2);
-        string emptyInformation = string.Join("\n", Enumerable.Repeat(" ", informationRows));
-        var information = new Panel(new Text(emptyInformation))
-            { Width = mini.Width, BorderStyle = PanelBorder }
-            .Header("Information")
-            .Border(BoxBorder.Rounded);
-        var side = new Rows(mini, information);
-
-        IRenderable maps;
-        if (layout.SideBySide)
-        {
-            var grid = new Grid().AddColumns(
-                new GridColumn { Width = main.Width, Padding = new Padding(0, 0) },
-                new GridColumn { Width = 1, Padding = new Padding(0, 0) },
-                new GridColumn { Width = mini.Width, Padding = new Padding(0, 0) });
-            grid.AddRow(main, new Text(" "), side);
-            maps = grid;
-        }
-        else
-        {
-            maps = new Rows(main, side);
-        }
-
-        var iterationContent = new List<IRenderable> { maps };
-        int width = IterationContentWidth;
-        if (layout.ShowScale)
-        {
-            iterationContent.Add(new Markup(DrawScale(width)));
-        }
-
-        var content = new List<IRenderable> { details };
-        if (layout.ShowControls)
-        {
-            var (column, row) = footprint.ToOffset(camera.Center);
-            string position = camera.Level.HasValue ? $"Zoom L{level}  ({column},{row})" : $"Overview  ({column},{row})";
-            if (camera.Level.HasValue && position.Length + 13 <= width)
-            {
-                position += "  ◈ viewport";
-            }
-
-            string controls = width >= 65
-                ? "Arrows/WASD pan  Shift+arrows fine  +/- zoom  R reset  Q quit"
-                : width >= 32 ? "Arrows  Shift: fine  +/-  R  Q" : "WASD +/- R Q";
-            iterationContent.Add(new Text(position));
-            content.Add(new Text(controls));
-        }
-
-        var iterationPanel = new Panel(new Rows(iterationContent))
-            { Padding = new Padding(0, 0), BorderStyle = ActiveBorder }
-            .Header($"Iteration {iteration}")
-            .Border(BoxBorder.Rounded);
-        content.Insert(1, iterationPanel);
-
-        return new Panel(new Rows(content))
-            { Padding = new Padding(1, 0), BorderStyle = FrameBorder }
-            .Header($"[bold {Accent}]Penguine Simulation[/]")
-            .Border(BoxBorder.Rounded);
-    }
-
-    private static Panel DrawPanel(string title, HexRegion region, int maxWidth, Func<HexCell, string> glyph) =>
-        DrawPanel(title, MapBounds.FromHex(region), maxWidth, cell => region.Contains(cell) ? glyph(cell) : " ");
-
-    private static Panel DrawPanel(string title, MapBounds bounds, int maxWidth, Func<HexCell, string> glyph)
-    {
-        var text = new StringBuilder();
-        for (int row = bounds.Top; row <= bounds.Bottom; row++)
-        {
-            if (row > bounds.Top)
-            {
-                text.Append('\n');
-            }
-
-            for (int x = bounds.Left; x <= bounds.Right; x++)
-            {
-                text.Append(((x - row) & 1) == 0 ? glyph(new HexCell((x - row) / 2, row)) : " ");
-            }
-        }
-
-        int width = Math.Min(maxWidth, Math.Max(title.Length + 4, bounds.Width + 4));
-        return new Panel(new Markup(text.ToString())) { Width = width, BorderStyle = PanelBorder }
-            .Header(title)
-            .Border(BoxBorder.Rounded);
-    }
-
-    private static string DensityGlyph(int count, bool highlighted = false)
-    {
-        string color = HeatmapScale.First(band => count <= band.Maximum).Color;
-        return highlighted ? $"[{color} on {ViewportBackground}]◈[/]" : $"[{color}]{(count == 0 ? "⬡" : "⬢")}[/]";
-    }
-
-    private static string DrawScale(int width)
-    {
-        string fullScale = "[bold]Penguins per hex[/]  "
-            + string.Join(" ", HeatmapScale.Select(band => $"{DensityGlyph(band.Maximum)}{band.Label}"));
-        if (width >= Markup.Remove(fullScale).Length)
-        {
-            return fullScale;
-        }
-
-        string glyphs = string.Concat(HeatmapScale.Select(band => DensityGlyph(band.Maximum)));
-        string compactScale = $"{HeatmapScale[0].Label} {glyphs} {HeatmapScale[^1].Label}";
-        return width >= Markup.Remove(compactScale).Length ? compactScale : glyphs;
-    }
-
-    private int IterationContentWidth => Math.Max(1, console.Profile.Width - 6);
-
-    private Layout GetLayout(bool interactive)
-    {
-        int width = IterationContentWidth;
-        int terminalHeight = console.Profile.Height > 0 ? console.Profile.Height : 24;
-        // Reserve two rows for each frame and two for the simulation details.
-        int height = Math.Max(1, terminalHeight - 6);
-        bool sideBySide = width >= 38;
-        bool showControls = interactive && width >= 26 && height >= (sideBySide ? 9 : 14);
-        bool showScale = width >= HeatmapScale.Length && height >= (sideBySide ? 7 : 11);
-        int mapHeight = height - (showControls ? 2 : 0) - (showScale ? 1 : 0);
-        int miniWidth = sideBySide ? width * 48 / 100 : width;
-        int sideHeight = sideBySide ? mapHeight : Math.Max(6, mapHeight / 2);
-        int mainWidth = sideBySide ? width - miniWidth - 1 : width;
-        int mainHeight = sideBySide ? mapHeight : mapHeight - sideHeight;
-
-        return new Layout(mainWidth, FittingRadius(mainWidth, mainHeight),
-            miniWidth, FittingRadius(miniWidth, sideHeight - 3), sideHeight, sideBySide, showControls, showScale);
-    }
-
-    private static int FittingRadius(int width, int height) =>
-        Math.Max(0, Math.Min((width - 5) / 4, (height - 3) / 2));
-
-    private static int MarkerRadius(int radius, int level, int miniLevel, int margin) =>
-        Math.Min(margin, (int)Math.Round(radius * Math.Pow(7, (level - miniLevel) / 2.0)));
-
-    private static (int Level, HexRegion Region) FitOverview(HexHeatmap heatmap, Layout layout) =>
-        heatmap.FitWorld(Math.Min(Math.Max(0, layout.MainRadius - 1), layout.MiniRadius));
-
+    /// <summary>Applies a keyboard command and returns whether the session should continue.</summary>
     private bool Navigate(ConsoleKeyInfo input, MapCamera camera, HexHeatmap heatmap)
     {
         if (input.Key == ConsoleKey.Q)
@@ -287,7 +81,7 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
             camera.Reset();
         }
 
-        var direction = input.Key switch
+        var (horizontal, vertical) = input.Key switch
         {
             ConsoleKey.LeftArrow or ConsoleKey.A => (-1, 0),
             ConsoleKey.RightArrow or ConsoleKey.D => (1, 0),
@@ -295,23 +89,25 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
             ConsoleKey.DownArrow or ConsoleKey.S => (0, 1),
             _ => (0, 0),
         };
-        var layout = GetLayout(interactive: true);
-        if (camera.Level.HasValue && direction != (0, 0))
+
+        if (camera.Level.HasValue && (horizontal, vertical) != (0, 0))
         {
-            var overview = FitOverview(heatmap, layout);
+            var overview = GetLayout(interactive: true).FitOverview(heatmap);
+
+            // A one-cell minimap has no neighbors, so it uses base-cell steps.
             if (input.Modifiers.HasFlag(ConsoleModifiers.Shift) || overview.Region.Radius == 0)
             {
-                camera.PanFine(direction.Item1, direction.Item2);
+                camera.PanFine(horizontal, vertical);
             }
             else
             {
-                camera.Pan(direction.Item1, direction.Item2, overview.Level, heatmap);
+                camera.Pan(horizontal, vertical, overview.Level, heatmap);
             }
         }
 
         if (input.KeyChar is '+' or '-')
         {
-            int overviewLevel = FitOverview(heatmap, layout).Level;
+            var overviewLevel = GetLayout(interactive: true).FitOverview(heatmap).Level;
             if (input.KeyChar == '+')
             {
                 camera.ZoomIn(overviewLevel);
@@ -324,26 +120,4 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
 
         return true;
     }
-
-    // The projected x coordinate uses half-column spacing between adjacent hex rows.
-    private readonly record struct MapBounds(int Left, int Top, int Right, int Bottom)
-    {
-        public int Width => Right - Left + 1;
-        public int Height => Bottom - Top + 1;
-
-        public static MapBounds FromHex(HexRegion hex)
-        {
-            int x = 2 * hex.Center.Q + hex.Center.R;
-            int r = hex.Radius;
-            return new(x - 2 * r, hex.Center.R - r, x + 2 * r, hex.Center.R + r);
-        }
-
-        public MapBounds Union(MapBounds other) =>
-            new(Math.Min(Left, other.Left), Math.Min(Top, other.Top),
-                Math.Max(Right, other.Right), Math.Max(Bottom, other.Bottom));
-    }
-
-    private readonly record struct Layout(
-        int MainWidth, int MainRadius, int MiniWidth, int MiniRadius, int SideHeight,
-        bool SideBySide, bool ShowControls, bool ShowScale);
 }

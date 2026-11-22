@@ -5,19 +5,70 @@ using HexEnvironment = PengSim.BL.Model.Environment;
 namespace PengSim.UI.Rendering;
 
 /// <summary>
-/// Direct, linear-time interactive renderer. No Spectre panel layout, markup
-/// parsing, or segment splitting occurs during navigation. Only the visible
-/// hexagons are sampled and written into a rectangular terminal buffer.
+/// Creates one complete terminal frame from the current camera and simulation.
+/// The caller publishes the completed rows in a single buffered update.
+///
+/// Layout coordinates are terminal character cells (x increases rightward,
+/// y increases downward), not hexagonal map coordinates. This is why the view
+/// windows are rectangular although every map cell and world boundary is hexagonal.
+///
+/// No Spectre layout tree is built per frame: only currently visible map cells
+/// are sampled, then the finished frame is encoded as ANSI-colored text rows.
 /// </summary>
 internal static class FrameRenderer
 {
+    // All sizes below are measured in terminal *character cells*, not hex cells.
+    // Leave one terminal row/column unused to avoid auto-wrap and scroll on
+    // terminals that scroll when the final cell in the last row is written.
+    private const int TerminalEdgeMargin = 1;
+    private const int MinimumWidth = 24;
+    private const int MinimumHeight = 14;
+
+    // Outer panel, metadata and iteration panel occupy the top/left padding.
+    private const int OuterInset = 2;
+    private const int SimulationNameRow = 1;
+    private const int SimulationPathRow = 2;
+    private const int IterationPanelTop = 3;
+    private const int IterationPanelBottomReserve = 5;
+    private const int IterationContentInset = 1;
+    private const int IterationFooterReserve = 4; // map bottom, legend and status
+
+    // The main panel occupies 52% of the map width when there is a sidebar.
+    // Below this threshold, main and minimap stack vertically instead.
+    private const int SideBySideWidth = 62;
+    private const int MainWidthPercent = 52;
+    private const int PercentageBase = 100;
+    private const int MinimumMainWidth = 16;
+    private const int PanelGap = 1;
+
+    // Reserve roughly 20% of the sidebar for the Information box, bounded
+    // so the minimap remains visible in terminals of different heights.
+    private const int InformationHeightDivisor = 5;
+    private const int MinimumInformationHeight = 5;
+    private const int MaximumInformationHeight = 8;
+    private const int MinimumStackedMainHeight = 5;
+    private const int MinimumStackedMinimapHeight = 3;
+
+    // In this glyph projection, adjacent hex centers are two text columns
+    // apart; the other columns preserve the staggered hex-grid appearance.
+    private const int HexColumnSpacing = 2;
+    private const int LegendTitleWidth = 18;
+    private const int PanStrideDivisor = 6;
+
+    // RGB values use the 0xRRGGBB format; the default color is a sentinel.
     private const uint OuterColor = 0x949494;
     private const uint PanelColor = 0x767676;
     private const uint AccentColor = HeatmapPalette.Accent;
     private const uint YellowColor = 0xffd75f;
     private const uint CenterColor = 0xfff0a0;
+    // One representative population from each heatmap color band, ordered
+    // exactly like HeatmapPalette. The legend is a swatch, not a second map.
     private static readonly int[] LegendCounts = [0, 1, 2, 4, 7, 15, 31, 63, 127, 128];
 
+    /// <summary>
+    /// Renders one complete frame. Plain text output is used when stdout is
+    /// redirected; interactive output contains ANSI foreground-color codes.
+    /// </summary>
     public static string[] RenderRows(
         HexEnvironment environment,
         HexFootprint footprint,
@@ -30,42 +81,50 @@ internal static class FrameRenderer
         int terminalHeight,
         bool ansi = true)
     {
-        var width = Math.Max(0, terminalWidth - 1);
-        var height = Math.Max(0, terminalHeight - 1);
-        if (width < 24 || height < 14)
+        var width = Math.Max(0, terminalWidth - TerminalEdgeMargin);
+        var height = Math.Max(0, terminalHeight - TerminalEdgeMargin);
+        if (width < MinimumWidth || height < MinimumHeight)
         {
             return ["Terminal too small for map view. Resize to at least 25 x 15."];
         }
 
         var screen = new Screen(width, height);
         screen.Box(0, 0, width, height, "Penguin Simulation", OuterColor);
-        screen.Text(2, 1, "Name: " + simulationName, HeatmapPalette.DefaultColor, width - 4);
-        screen.Text(2, 2, "Path: " + (outputPath ?? "Unsaved"), HeatmapPalette.DefaultColor, width - 4);
+        screen.Text(OuterInset, SimulationNameRow,
+            "Name: " + simulationName, HeatmapPalette.DefaultColor, width - 2 * OuterInset);
+        screen.Text(OuterInset, SimulationPathRow,
+            "Path: " + (outputPath ?? "Unsaved"), HeatmapPalette.DefaultColor, width - 2 * OuterInset);
 
-        var iterationX = 2;
-        var iterationY = 3;
-        var iterationWidth = width - 4;
-        var iterationHeight = height - 5;
+        // Nested panels are positioned by their outer border. Each inner
+        // rectangle is inset by one cell so it cannot overwrite that border.
+        var iterationX = OuterInset;
+        var iterationY = IterationPanelTop;
+        var iterationWidth = width - 2 * OuterInset;
+        var iterationHeight = height - IterationPanelBottomReserve;
         screen.Box(iterationX, iterationY, iterationWidth, iterationHeight,
             $"Iteration {iteration}", AccentColor);
 
-        var mapX = iterationX + 1;
-        var mapY = iterationY + 1;
-        var mapWidth = iterationWidth - 2;
-        var mapHeight = iterationHeight - 4; // reserve legend and position
+        var mapX = iterationX + IterationContentInset;
+        var mapY = iterationY + IterationContentInset;
+        var mapWidth = iterationWidth - 2 * IterationContentInset;
+        var mapHeight = iterationHeight - IterationFooterReserve;
         var overview = FitOverview(heatmap, terminalWidth, terminalHeight);
         var level = camera.Level ?? overview.Level;
         var mainCenter = camera.Level.HasValue
             ? HexGridScale.ToLevel(camera.Center, level)
             : overview.Region.Center;
 
-        if (width >= 62)
+        if (width >= SideBySideWidth)
         {
-            var mainWidth = Math.Max(16, mapWidth * 52 / 100);
-            var miniWidth = mapWidth - mainWidth - 1;
-            var infoHeight = Math.Clamp(mapHeight / 5, 5, 8);
+            // Wide terminals: main map on the left; overview and Information
+            // share the right column. The one-cell gap separates the panels.
+            var mainWidth = Math.Max(MinimumMainWidth,
+                mapWidth * MainWidthPercent / PercentageBase);
+            var miniWidth = mapWidth - mainWidth - PanelGap;
+            var infoHeight = Math.Clamp(mapHeight / InformationHeightDivisor,
+                MinimumInformationHeight, MaximumInformationHeight);
             var miniHeight = mapHeight - infoHeight;
-            var miniX = mapX + mainWidth + 1;
+            var miniX = mapX + mainWidth + PanelGap;
 
             DrawMain(screen, environment, footprint, heatmap, level, mainCenter,
                 mapX, mapY, mainWidth, mapHeight);
@@ -78,8 +137,9 @@ internal static class FrameRenderer
         }
         else
         {
-            var mainHeight = Math.Max(5, mapHeight * 2 / 3);
-            var miniHeight = Math.Max(3, mapHeight - mainHeight);
+            // Narrow terminals: stack the main map above the minimap.
+            var mainHeight = Math.Max(MinimumStackedMainHeight, mapHeight * 2 / 3);
+            var miniHeight = Math.Max(MinimumStackedMinimapHeight, mapHeight - mainHeight);
             DrawMain(screen, environment, footprint, heatmap, level, mainCenter,
                 mapX, mapY, mapWidth, mainHeight);
             DrawMinimap(screen, environment, footprint, heatmap, camera,
@@ -89,11 +149,12 @@ internal static class FrameRenderer
         }
 
         var legendY = mapY + mapHeight;
-        screen.Text(mapX, legendY, "Penguins per hex", HeatmapPalette.DefaultColor, 18);
-        var paletteStart = mapX + 18;
+        screen.Text(mapX, legendY, "Penguins per hex",
+            HeatmapPalette.DefaultColor, LegendTitleWidth);
+        var paletteStart = mapX + LegendTitleWidth;
         for (var i = 0; i < LegendCounts.Length; i++)
         {
-            var x = paletteStart + i * 2;
+            var x = paletteStart + i * HexColumnSpacing;
             if (x >= mapX + mapWidth)
             {
                 break;
@@ -108,41 +169,69 @@ internal static class FrameRenderer
             ? $"Zoom L{level}   ({column}, {row})"
             : $"Overview L{overview.Level}   ({column}, {row})";
         screen.Text(mapX, legendY + 1, status, HeatmapPalette.DefaultColor, mapWidth);
-        screen.Text(2, height - 2,
+        screen.Text(OuterInset, height - OuterInset,
             "Arrows/WASD pan   Shift+arrows fine   +/- zoom   R reset   Q quit",
-            HeatmapPalette.DefaultColor, width - 4);
+            HeatmapPalette.DefaultColor, width - 2 * OuterInset);
 
         return screen.ToAnsiRows(ansi);
     }
 
+    /// <summary>
+    /// Choose the first zoom level whose entire world fits within the minimap.
+    /// This uses the same layout math as RenderRows so +/- navigation cannot
+    /// disagree with the zoom level actually drawn.
+    /// </summary>
     public static (int Level, HexRegion Region) FitOverview(
         HexHeatmap heatmap, int terminalWidth, int terminalHeight)
     {
-        var width = Math.Max(0, terminalWidth - 1);
-        var height = Math.Max(0, terminalHeight - 1);
-        return ChooseOverview(heatmap, width - 6, height - 9, width >= 62);
+        var width = Math.Max(0, terminalWidth - TerminalEdgeMargin);
+        var height = Math.Max(0, terminalHeight - TerminalEdgeMargin);
+        // 6 columns = two outer insets + two iteration-content insets.
+        // 9 rows = iteration top + iteration bottom reserve + footer reserve
+        // minus the overlap with the iteration content inset.
+        var mapWidth = width - (2 * OuterInset + 2 * IterationContentInset);
+        var mapHeight = height - (IterationPanelBottomReserve + IterationFooterReserve);
+        return ChooseOverview(heatmap, mapWidth, mapHeight, width >= SideBySideWidth);
     }
 
+    /// <summary>
+    /// Arrow navigation moves by roughly one sixth of the visible map span,
+    /// measured in display hex cells (half the terminal text-column count).
+    /// </summary>
     public static int PanStride(int terminalWidth, int terminalHeight)
     {
-        var width = Math.Max(24, terminalWidth - 1);
-        var height = Math.Max(14, terminalHeight - 1);
-        var mapWidth = width - 6;
-        var mapHeight = height - 9;
-        var mainWidth = width >= 62 ? Math.Max(16, mapWidth * 52 / 100) : mapWidth;
-        var mainHeight = width >= 62 ? mapHeight : Math.Max(5, mapHeight * 2 / 3);
-        return Math.Max(1, Math.Min((mainWidth - 2) / 2, mainHeight - 2) / 6);
+        var width = Math.Max(MinimumWidth, terminalWidth - TerminalEdgeMargin);
+        var height = Math.Max(MinimumHeight, terminalHeight - TerminalEdgeMargin);
+        var mapWidth = width - (2 * OuterInset + 2 * IterationContentInset);
+        var mapHeight = height - (IterationPanelBottomReserve + IterationFooterReserve);
+        var mainWidth = width >= SideBySideWidth
+            ? Math.Max(MinimumMainWidth, mapWidth * MainWidthPercent / PercentageBase)
+            : mapWidth;
+        var mainHeight = width >= SideBySideWidth
+            ? mapHeight
+            : Math.Max(MinimumStackedMainHeight, mapHeight * 2 / 3);
+        return Math.Max(1, Math.Min(
+            (mainWidth - 2 * IterationContentInset) / HexColumnSpacing,
+            mainHeight - 2 * IterationContentInset) / PanStrideDivisor);
     }
 
+    /// <summary>
+    /// A displayed world hexagon of radius R spans 4R+1 columns and 2R+1
+    /// rows on the terminal. Pick a radius that fits both panels, plus margin
+    /// for world-border dots, then ask the hex heatmap for the right level.
+    /// </summary>
     private static (int Level, HexRegion Region) ChooseOverview(
         HexHeatmap heatmap, int width, int height, bool sideBySide)
     {
         var miniWidth = sideBySide
-            ? width - Math.Max(16, width * 52 / 100) - 1
+            ? width - Math.Max(MinimumMainWidth,
+                width * MainWidthPercent / PercentageBase) - PanelGap
             : width;
         var miniHeight = sideBySide
-            ? height - Math.Clamp(height / 5, 5, 8)
-            : Math.Max(3, height - Math.Max(5, height * 2 / 3));
+            ? height - Math.Clamp(height / InformationHeightDivisor,
+                MinimumInformationHeight, MaximumInformationHeight)
+            : Math.Max(MinimumStackedMinimapHeight,
+                height - Math.Max(MinimumStackedMainHeight, height * 2 / 3));
         var availableWidth = Math.Max(1, Math.Min(width, miniWidth) - 2);
         var availableHeight = Math.Max(1, Math.Min(height, miniHeight) - 2);
 
@@ -152,6 +241,11 @@ internal static class FrameRenderer
         return heatmap.FitWorld(radius);
     }
 
+    /// <summary>
+    /// The camera exposes a rectangular screen window. Converting the camera
+    /// axial center (q,r) to screen coordinates (2q+r,r) leaves hex cell shape
+    /// and population data unchanged.
+    /// </summary>
     private static void DrawMain(
         Screen screen, HexEnvironment environment, HexFootprint footprint,
         HexHeatmap heatmap, int level, HexCell center,
@@ -167,6 +261,11 @@ internal static class FrameRenderer
             x + 1, y + 1, null, null);
     }
 
+    /// <summary>
+    /// Draw a fixed world overview. Its content never pans: only the yellow
+    /// rectangle projected from the main window and its center marker move.
+    /// Both viewports use the same unrotated hexagonal coordinate axes.
+    /// </summary>
     private static void DrawMinimap(
         Screen screen, HexEnvironment environment, HexFootprint footprint,
         HexHeatmap heatmap, MapCamera camera,
@@ -191,6 +290,7 @@ internal static class FrameRenderer
             x + 1, y + 1, selection, selectedCenter);
     }
 
+    /// <summary>Show the camera's base-cell position and the minimap legend.</summary>
     private static void DrawInformation(
         Screen screen, HexFootprint footprint, MapCamera camera,
         int level, int overviewLevel,
@@ -214,6 +314,11 @@ internal static class FrameRenderer
         }
     }
 
+    /// <summary>
+    /// Rasterize only the requested rectangle. Hex cells occur on alternating
+    /// screen columns: screenX = 2*q+r, screenY = r. The other columns remain
+    /// blank so the hexagonal rows appear staggered in a monospace terminal.
+    /// </summary>
     private static void DrawCells(
         Screen screen, HexEnvironment environment, HexFootprint footprint,
         HexHeatmap heatmap, int level, MapScreenBounds bounds,
@@ -229,6 +334,8 @@ internal static class FrameRenderer
             for (var x = 0; x < bounds.Width; x++)
             {
                 var mapX = bounds.Left + x;
+                // Invert screenX = 2*q+r to recover q; odd values fall
+                // between cell centers and must remain empty spacer columns.
                 var axialColumn = mapX - row;
                 if ((axialColumn & 1) != 0)
                 {
@@ -252,6 +359,11 @@ internal static class FrameRenderer
         }
     }
 
+    /// <summary>
+    /// L0 reads the current simulation directly. Coarser hex cells use the
+    /// sparse aggregate index. Only cells at distance R+1 from the *world*
+    /// center get the teal border; the camera perimeter never gets it.
+    /// </summary>
     private static Pixel GetCellPaint(
         HexEnvironment environment, HexFootprint footprint, HexHeatmap heatmap,
         HexRegion world, int level, HexCell cell)
@@ -279,9 +391,13 @@ internal static class FrameRenderer
     private static Pixel FromPaint(MapPaint paint) =>
         new(paint.Glyph, paint.Color);
 
+    /// <summary>A glyph and 24-bit RGB foreground; no background colors.</summary>
     private readonly record struct Pixel(char Glyph, uint Foreground);
 
-    /// <summary>Fixed-size screen with one terminal-cell value per position.</summary>
+    /// <summary>
+    /// A flat row-major array of terminal cells. Painting is random access
+    /// (O(1)); all rendering is completed before terminal I/O begins.
+    /// </summary>
     private sealed class Screen
     {
         private readonly Pixel[] _cells;
@@ -296,6 +412,7 @@ internal static class FrameRenderer
             Array.Fill(_cells, new Pixel(' ', HeatmapPalette.DefaultColor));
         }
 
+        /// <summary>Clip draws against terminal size instead of world size.</summary>
         public void Put(int x, int y, Pixel value)
         {
             if (x >= 0 && x < _width && y >= 0 && y < _height)
@@ -307,6 +424,10 @@ internal static class FrameRenderer
         private void Put(int x, int y, char glyph, uint color) =>
             Put(x, y, new Pixel(glyph, color));
 
+        /// <summary>
+        /// Write clipped text directly to cells. Control bytes are sanitized
+        /// so a simulation name/path cannot issue terminal escape commands.
+        /// </summary>
         public void Text(int x, int y, string value, uint color, int maximumLength)
         {
             if (maximumLength <= 0)
@@ -323,6 +444,10 @@ internal static class FrameRenderer
             }
         }
 
+        /// <summary>
+        /// Draw the four corners and edges of one rectangular display panel.
+        /// Box drawing is separate from the underlying hexagonal world.
+        /// </summary>
         public void Box(int x, int y, int width, int height, string title, uint color)
         {
             if (width < 2 || height < 2)
@@ -353,6 +478,11 @@ internal static class FrameRenderer
             }
         }
 
+        /// <summary>
+        /// Encode each completed screen row. Foreground escapes are emitted
+        /// only when a cell's RGB color differs from the previous cell.
+        /// Plain output omits escapes for redirected stdout.
+        /// </summary>
         public string[] ToAnsiRows(bool ansi)
         {
             var result = new string[_height];
@@ -369,21 +499,19 @@ internal static class FrameRenderer
                         currentColor = cell.Foreground;
                         if (currentColor == HeatmapPalette.DefaultColor)
                         {
-                            builder.Append("\u001b[0m");
+                            builder.Append(AnsiCodes.ResetStyle);
                         }
                         else
                         {
-                            builder.Append("\u001b[38;2;")
-                                .Append((currentColor >> 16) & 255).Append(';')
-                                .Append((currentColor >> 8) & 255).Append(';')
-                                .Append(currentColor & 255).Append('m');
+                            AnsiCodes.AppendForegroundRgb(builder, currentColor);
                         }
                     }
 
                     builder.Append(cell.Glyph);
                 }
 
-                if (ansi) builder.Append("\u001b[0m");
+                // Keep every row independently styled for changed-row output.
+                if (ansi) builder.Append(AnsiCodes.ResetStyle);
                 result[row] = builder.ToString();
             }
 

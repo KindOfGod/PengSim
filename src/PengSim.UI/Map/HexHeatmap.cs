@@ -10,6 +10,8 @@ namespace PengSim.UI.Map;
 /// </summary>
 internal sealed class HexHeatmap
 {
+    // One sparse dictionary per zoom level. Only buckets containing penguins
+    // have entries; an absent key represents a valid zero population.
     private readonly List<Level> _levels = [];
 
     public HexHeatmap(HexEnvironment environment, HexFootprint footprint)
@@ -22,7 +24,10 @@ internal sealed class HexHeatmap
         // Build only the world extents, not cell-to-parent membership arrays.
         // Extrema on each of the six world sides take O(radius * levels),
         // instead of visiting every cell at every level.
-        for (var level = 1; level <= 30; level++)
+        // Each step doubles the display hex size. Stop when the full map
+        // fits in one bucket; there is no reason to allocate coarser levels.
+        const int MaxZoomLevel = 30;
+        for (var level = 1; level <= MaxZoomLevel; level++)
         {
             var radius = GetCoarseRadius(footprint.Radius, level);
             _levels.Add(new Level(new HexRegion(default, radius), new Dictionary<HexCell, int>()));
@@ -68,6 +73,8 @@ internal sealed class HexHeatmap
             throw new ArgumentOutOfRangeException(nameof(delta), "Expected +1 or -1.");
         }
 
+        // A base-cell occupancy change affects exactly one coarse hex per
+        // level, so this is O(level count), not O(world area).
         for (var i = 0; i < _levels.Count; i++)
         {
             var entry = _levels[i];
@@ -93,6 +100,11 @@ internal sealed class HexHeatmap
 
     public HexRegion GetRegion(int level) => _levels[level - 1].Region;
 
+    /// <summary>
+    /// Return the finest complete-world level that fits in a hex of the
+    /// requested display radius. The main viewport can subsequently zoom
+    /// into any rectangle, including the off-world storage corners.
+    /// </summary>
     public (int Level, HexRegion Region) FitWorld(int maxRadius)
     {
         var index = _levels.FindIndex(level => level.Region.Radius <= maxRadius);

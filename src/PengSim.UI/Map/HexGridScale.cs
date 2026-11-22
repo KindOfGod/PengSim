@@ -17,11 +17,16 @@ internal static class HexGridScale
         ArgumentOutOfRangeException.ThrowIfNegative(level);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(level, 30);
 
+        // The display index is not BL's seven-child hierarchy: it is a
+        // world-aligned hex lattice scaled by 2^level, with no rotation.
         var scale = (double)(1L << level);
         var q = cell.Q / scale;
         var r = cell.R / scale;
         var s = -q - r;
 
+        // Cube coordinates obey q + r + s = 0. Independently rounding all
+        // three axes could break that invariant, so correct the coordinate
+        // with the largest rounding error after taking rounded values.
         var rq = Math.Round(q, MidpointRounding.AwayFromZero);
         var rr = Math.Round(r, MidpointRounding.AwayFromZero);
         var rs = Math.Round(s, MidpointRounding.AwayFromZero);
@@ -30,6 +35,8 @@ internal static class HexGridScale
         var dr = Math.Abs(rr - r);
         var ds = Math.Abs(rs - s);
 
+        // Deterministic tie-breaking ensures every base hex maps to exactly
+        // one bucket, even on boundaries between two coarse hex centers.
         if (dq > dr && dq > ds)
         {
             rq = -rr - rs;
@@ -52,6 +59,8 @@ internal static class HexGridScale
         ArgumentOutOfRangeException.ThrowIfNegative(level);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(level, 30);
 
+        // The inverse maps a coarse bucket center into base-level axial
+        // coordinates. This is used for camera motion, not BL mutations.
         var scale = 1L << level;
         return new HexCell(
             checked((int)(cell.Q * scale)),

@@ -6,9 +6,14 @@ namespace PengSim.UI.Map;
 /// </summary>
 internal readonly record struct MapScreenBounds(int Left, int Top, int Width, int Height)
 {
+    // Exclusive endpoints simplify loops: for (x = Left; x < Right; x++).
     public int Right => Left + Width;
     public int Bottom => Top + Height;
 
+    /// <summary>
+    /// Position a constant-size rectangle around its center. The (size-1)/2
+    /// offset avoids changing the viewport's dimensions while panning.
+    /// </summary>
     public static MapScreenBounds Centered(int centerX, int centerY, int width, int height) =>
         new(centerX - (width - 1) / 2, centerY - (height - 1) / 2, width, height);
 }
@@ -19,12 +24,17 @@ internal readonly record struct MapScreenBounds(int Left, int Top, int Width, in
 /// </summary>
 internal readonly record struct MinimapViewport(int Left, int Top, int Right, int Bottom)
 {
+    // A hex glyph occupies alternating terminal columns. Mark a two-column
+    // band so vertical rectangle edges remain visible on both row parities.
+    private const int HorizontalBorderWidth = 2;
     public bool Contains(int x, int y) =>
         x >= Left && x <= Right && y >= Top && y <= Bottom;
 
     public bool IsOnBorder(int x, int y) =>
         Contains(x, y) &&
-        (x - Left <= 2 || Right - x <= 2 || y == Top || y == Bottom);
+        (x - Left <= HorizontalBorderWidth ||
+         Right - x <= HorizontalBorderWidth ||
+         y == Top || y == Bottom);
 }
 
 /// <summary>
@@ -33,6 +43,12 @@ internal readonly record struct MinimapViewport(int Left, int Top, int Right, in
 /// </summary>
 internal static class ViewportProjection
 {
+    /// <summary>
+    /// A zoom step multiplies the distance between neighboring display-hex
+    /// centers by two. Project the screen center and half-sizes separately:
+    /// round the center for movement, but derive edge offsets only from the
+    /// dimensions and zoom difference. This keeps a stable rectangle on pan.
+    /// </summary>
     public static MinimapViewport Project(
         MapScreenBounds visible, int detailLevel, int minimapLevel)
     {

@@ -53,3 +53,7 @@ Add an entry here when making a change or deciding how the simulation is designe
 ## 2026-11-22 — Compact map panels
 
 - The terminal size determines how much detail fits. Each panel then sizes its border to the rendered hex and title, so the minimap stays one column away from the main panel even on wide terminals.
+
+## 2026-11-22 — Minimap pan steps
+
+- The viewport marker is a regular hex with a fixed radius at each zoom level. Pan keys move its center one minimap cell at a time and place the main camera at that parent cell's center in the base grid. Panning stops before the marker would cross the minimap boundary.

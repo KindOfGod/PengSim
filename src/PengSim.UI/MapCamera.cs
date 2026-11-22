@@ -7,26 +7,28 @@ internal sealed class MapCamera(HexFootprint footprint)
     public int Zoom { get; private set; }
     public HexRegion View => new(_center, (int)Math.Round(footprint.Radius / Math.Pow(2, Zoom), MidpointRounding.AwayFromZero));
 
-    public void Pan(int horizontal, int vertical)
+    public void Pan(int horizontal, int vertical, int overviewLevel, HexRegion limits)
     {
-        if (Zoom == 0)
+        var cell = _center.Ancestor(overviewLevel);
+        int row = cell.R + vertical;
+        int q = cell.Q + horizontal + (cell.R >> 1) - (row >> 1);
+        var target = new HexCell(q, row);
+        var center = target.DescendToCenter(overviewLevel);
+        if (limits.Contains(target) && footprint.Region.Contains(center))
         {
-            return;
+            _center = center;
         }
+    }
 
-        var (column, row) = footprint.ToOffset(_center);
-        int step = Math.Max(1, View.Radius / 2);
-        for (int i = 0; i < step; i++)
+    public void KeepMarkerInBounds(int overviewLevel, HexRegion limits)
+    {
+        var cell = _center.Ancestor(overviewLevel);
+        if (!limits.Contains(cell))
         {
-            var next = footprint.ToAxial(column + horizontal, row + vertical);
-            if (!footprint.Region.Contains(next))
-            {
-                break;
-            }
-
-            column += horizontal;
-            row += vertical;
-            _center = next;
+            _center = limits.Cells()
+                .Select(candidate => (Cell: candidate, Center: candidate.DescendToCenter(overviewLevel)))
+                .Where(candidate => footprint.Region.Contains(candidate.Center))
+                .MinBy(candidate => candidate.Cell.DistanceTo(cell)).Center;
         }
     }
 

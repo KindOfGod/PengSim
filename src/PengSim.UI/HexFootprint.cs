@@ -16,6 +16,28 @@ internal readonly record struct HexCell(int Q, int R)
         return Math.Max(Math.Max(Math.Abs(q), Math.Abs(r)), Math.Abs(q + r));
     }
 
+    public HexCell Ancestor(int level)
+    {
+        var cell = this;
+        for (int i = 0; i < level; i++)
+        {
+            cell = cell.Parent();
+        }
+
+        return cell;
+    }
+
+    public HexCell DescendToCenter(int level)
+    {
+        var cell = this;
+        for (int i = 0; i < level; i++)
+        {
+            cell = new HexCell(2 * cell.Q - cell.R, cell.Q + 3 * cell.R);
+        }
+
+        return cell;
+    }
+
     public HexCell Parent()
     {
         // Coarse basis vectors (2, 1) and (-1, 3) define an index-seven hex lattice.

@@ -75,14 +75,4 @@ internal sealed class HexHeatmap
         throw new InvalidOperationException("The heatmap requires a parent level.");
     }
 
-    public HashSet<HexCell> ProjectViewport(HexRegion viewport, int level)
-    {
-        var cells = viewport.Cells().Where(_world.Contains).ToHashSet();
-        for (int i = 0; i < level; i++)
-        {
-            cells = cells.Select(cell => cell.Parent()).ToHashSet();
-        }
-
-        return cells;
-    }
 }

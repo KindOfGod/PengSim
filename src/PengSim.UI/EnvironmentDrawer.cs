@@ -37,7 +37,7 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
                 context.Refresh();
                 while (true)
                 {
-                    if (Console.KeyAvailable && !Navigate(Console.ReadKey(intercept: true), camera))
+                    if (Console.KeyAvailable && !Navigate(Console.ReadKey(intercept: true), camera, heatmap, footprint.Region))
                     {
                         return;
                     }
@@ -46,6 +46,13 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
                     var size = (console.Profile.Width, console.Profile.Height);
                     if (view != lastView || camera.Zoom != lastZoom || size != lastSize)
                     {
+                        if (camera.Zoom > 0)
+                        {
+                            var overview = heatmap.GetView(footprint.Region, GetLayout(camera.Zoom, true).MiniRadius);
+                            camera.KeepMarkerInBounds(overview.Level, MarkerLimits(view.Radius, overview.Level, overview.Region));
+                            view = camera.View;
+                        }
+
                         context.UpdateTarget(Render(environment, footprint, heatmap, camera, interactive: true));
                         context.Refresh();
                         lastView = view;
@@ -93,9 +100,10 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
         if (camera.Zoom > 0)
         {
             var overview = heatmap.GetView(footprint.Region, layout.MiniRadius);
-            var highlighted = heatmap.ProjectViewport(view, overview.Level);
+            var limits = MarkerLimits(view.Radius, overview.Level, overview.Region);
+            var marker = new HexRegion(view.Center.Ancestor(overview.Level), overview.Region.Radius - limits.Radius);
             var mini = DrawPanel($"Minimap · L{overview.Level}", overview.Region, layout.MiniWidth,
-                cell => DensityGlyph(overview.Counts.GetValueOrDefault(cell), highlighted.Contains(cell)));
+                cell => DensityGlyph(overview.Counts.GetValueOrDefault(cell), marker.Contains(cell)));
 
             if (layout.SideBySide)
             {
@@ -207,16 +215,39 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
     private static int FittingRadius(int width, int height) =>
         Math.Max(0, Math.Min((width - 5) / 4, (height - 3) / 2));
 
-    private bool Navigate(ConsoleKeyInfo input, MapCamera camera)
+    private static HexRegion MarkerLimits(int viewRadius, int overviewLevel, HexRegion overview)
     {
-        switch (input.Key)
+        // Each aggregation level reduces linear scale by the square root of seven.
+        int radius = (int)Math.Round(viewRadius / Math.Pow(7, overviewLevel / 2.0));
+        radius = Math.Clamp(radius, 0, Math.Max(0, overview.Radius - 1));
+        return overview with { Radius = overview.Radius - radius };
+    }
+
+    private bool Navigate(ConsoleKeyInfo input, MapCamera camera, HexHeatmap heatmap, HexRegion world)
+    {
+        if (input.Key == ConsoleKey.Q)
         {
-            case ConsoleKey.Q: return false;
-            case ConsoleKey.LeftArrow or ConsoleKey.A: camera.Pan(-1, 0); break;
-            case ConsoleKey.RightArrow or ConsoleKey.D: camera.Pan(1, 0); break;
-            case ConsoleKey.UpArrow or ConsoleKey.W: camera.Pan(0, -1); break;
-            case ConsoleKey.DownArrow or ConsoleKey.S: camera.Pan(0, 1); break;
-            case ConsoleKey.R: camera.Reset(); break;
+            return false;
+        }
+
+        if (input.Key == ConsoleKey.R)
+        {
+            camera.Reset();
+        }
+
+        var direction = input.Key switch
+        {
+            ConsoleKey.LeftArrow or ConsoleKey.A => (-1, 0),
+            ConsoleKey.RightArrow or ConsoleKey.D => (1, 0),
+            ConsoleKey.UpArrow or ConsoleKey.W => (0, -1),
+            ConsoleKey.DownArrow or ConsoleKey.S => (0, 1),
+            _ => (0, 0),
+        };
+        if (camera.Zoom > 0 && direction != (0, 0))
+        {
+            var overview = heatmap.GetView(world, GetLayout(camera.Zoom, true).MiniRadius);
+            var limits = MarkerLimits(camera.View.Radius, overview.Level, overview.Region);
+            camera.Pan(direction.Item1, direction.Item2, overview.Level, limits);
         }
 
         if (input.KeyChar == '+' && (camera.Zoom == 0 || camera.View.Radius > GetLayout(camera.Zoom, true).MainRadius))

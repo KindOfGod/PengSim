@@ -1,6 +1,6 @@
 namespace PengSim.BL.Model;
 
-/// <summary>A flat-topped hex grid with odd columns offset down by half a cell.</summary>
+/// <summary>A pointy-topped hex grid with odd rows offset right by half a cell.</summary>
 public sealed class Environment
 {
     public const int EmptyCell = 0;

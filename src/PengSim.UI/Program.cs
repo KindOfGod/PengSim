@@ -11,6 +11,7 @@ internal static class Program
         var builder = new ContainerBuilder();
         builder.RegisterModule<SimulationModule>();
         builder.RegisterInstance(AnsiConsole.Console).As<IAnsiConsole>().ExternallyOwned();
+        builder.RegisterType<EnvironmentDrawer>();
         builder.RegisterType<SimulationDemo>();
 
         using var container = builder.Build();

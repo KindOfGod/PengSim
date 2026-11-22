@@ -94,3 +94,8 @@ Add an entry here when making a change or deciding how the simulation is designe
 
 - The console wraps the maps, Information panel, legend, and controls in a border titled “Penguine Simulation”. Two rows show the simulation name and output path with Spectre.Console's penguin and folder icons.
 - The demo is named “Penguin colonies demo” and shows “Unsaved” until an output path is supplied. Rendering accepts an optional path and reserves space for the metadata in its terminal layout.
+
+## 2026-11-22 — Iteration view and colors
+
+- The heatmap, minimap, Information panel, and density legend sit inside a separate iteration frame. The demo displays iteration 0. The simulation metadata and keyboard shortcuts sit outside that frame, leaving room for playback controls when playback is implemented.
+- Frame colors distinguish the application, iteration, main map, minimap, and Information panel. Heatmap density colors retain their existing meaning.

@@ -18,21 +18,25 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
         (int.MaxValue, "red", "16+"),
     ];
 
-    public void Show(HexEnvironment environment, HexFootprint footprint, string simulationName, string? outputPath = null)
+    public void Show(
+        HexEnvironment environment, HexFootprint footprint, string simulationName,
+        string? outputPath = null, int iteration = 0)
     {
         var heatmap = new HexHeatmap(environment, footprint);
         var camera = new MapCamera(footprint);
         var details = new Rows(
-            new Text($"{Emoji.Known.Penguin}  Name: {simulationName}") { Overflow = Overflow.Ellipsis },
-            new Text($"{Emoji.Known.FileFolder}  Path: {outputPath ?? "Unsaved"}") { Overflow = Overflow.Ellipsis });
+            new Markup($"[bold aqua]{Emoji.Known.Penguin}  Name:[/] {Markup.Escape(simulationName)}")
+                { Overflow = Overflow.Ellipsis },
+            new Markup($"[bold yellow]{Emoji.Known.FileFolder}  Path:[/] {Markup.Escape(outputPath ?? "Unsaved")}")
+                { Overflow = Overflow.Ellipsis });
         if (Console.IsInputRedirected || Console.IsOutputRedirected || !console.Profile.Capabilities.Interactive)
         {
-            console.Write(Render(environment, footprint, heatmap, camera, details, interactive: false));
+            console.Write(Render(environment, footprint, heatmap, camera, details, iteration, interactive: false));
             return;
         }
 
         console.Clear();
-        console.Live(Render(environment, footprint, heatmap, camera, details, interactive: true))
+        console.Live(Render(environment, footprint, heatmap, camera, details, iteration, interactive: true))
             .AutoClear(false)
             .Start(context =>
             {
@@ -50,7 +54,7 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
                     var size = (console.Profile.Width, console.Profile.Height);
                     if (camera.Center != lastCenter || camera.Level != lastLevel || size != lastSize)
                     {
-                        context.UpdateTarget(Render(environment, footprint, heatmap, camera, details, interactive: true));
+                        context.UpdateTarget(Render(environment, footprint, heatmap, camera, details, iteration, interactive: true));
                         context.Refresh();
                         lastCenter = camera.Center;
                         lastLevel = camera.Level;
@@ -68,6 +72,7 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
         HexHeatmap heatmap,
         MapCamera camera,
         Rows details,
+        int iteration,
         bool interactive)
     {
         var layout = GetLayout(interactive);
@@ -81,7 +86,7 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
         var counts = level > 0 ? heatmap.GetCounts(level) : null;
         var worldAtLevel = level > 0 ? heatmap.GetRegion(level) : footprint.Region;
 
-        var main = DrawPanel(level == 0 ? "Hex grid · L0" : $"Heatmap · L{level}", drawRegion, layout.MainWidth, cell =>
+        var main = DrawPanel(level == 0 ? "Hex grid · L0" : $"Heatmap · L{level}", drawRegion, layout.MainWidth, Color.Aqua, cell =>
         {
             int distance = cell.DistanceTo(view.Center);
             if (distance > view.Radius)
@@ -114,7 +119,7 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
             miniBounds = miniBounds.Union(MapBounds.FromHex(marker));
         }
 
-        var mini = DrawPanel($"Minimap · L{overview.Level}", miniBounds, layout.MiniWidth, cell =>
+        var mini = DrawPanel($"Minimap · L{overview.Level}", miniBounds, layout.MiniWidth, Color.Green, cell =>
         {
             if (camera.Level.HasValue && marker.Contains(cell))
             {
@@ -126,7 +131,8 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
 
         int informationRows = Math.Max(1, layout.SideHeight - (miniBounds.Height + 2) - 2);
         string emptyInformation = string.Join("\n", Enumerable.Repeat(" ", informationRows));
-        var information = new Panel(new Text(emptyInformation)) { Width = mini.Width }
+        var information = new Panel(new Text(emptyInformation))
+            { Width = mini.Width, BorderStyle = new Style(Color.Yellow) }
             .Header("Information")
             .Border(BoxBorder.Rounded);
         var side = new Rows(mini, information);
@@ -146,13 +152,14 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
             maps = new Rows(main, side);
         }
 
-        var content = new List<IRenderable> { details, maps };
-        int width = FrameContentWidth;
+        var iterationContent = new List<IRenderable> { maps };
+        int width = IterationContentWidth;
         if (layout.ShowScale)
         {
-            content.Add(new Markup(DrawScale(width)));
+            iterationContent.Add(new Markup(DrawScale(width)));
         }
 
+        var content = new List<IRenderable> { details };
         if (layout.ShowControls)
         {
             var (column, row) = footprint.ToOffset(camera.Center);
@@ -165,19 +172,26 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
             string controls = width >= 65
                 ? "Arrows/WASD pan  Shift+arrows fine  +/- zoom  R reset  Q quit"
                 : width >= 32 ? "Arrows  Shift: fine  +/-  R  Q" : "WASD +/- R Q";
-            content.Add(new Text(position));
-            content.Add(new Text(controls));
+            iterationContent.Add(new Text(position, new Style(Color.Aqua)));
+            content.Add(new Text(controls, new Style(Color.Yellow)));
         }
 
-        return new Panel(new Rows(content)) { Padding = new Padding(1, 0) }
-            .Header("Penguine Simulation")
+        var iterationPanel = new Panel(new Rows(iterationContent))
+            { Padding = new Padding(0, 0), BorderStyle = new Style(Color.Fuchsia) }
+            .Header($"Iteration {iteration}")
+            .Border(BoxBorder.Rounded);
+        content.Insert(1, iterationPanel);
+
+        return new Panel(new Rows(content))
+            { Padding = new Padding(1, 0), BorderStyle = new Style(Color.Blue) }
+            .Header("[bold aqua]Penguine Simulation[/]")
             .Border(BoxBorder.Rounded);
     }
 
-    private static Panel DrawPanel(string title, HexRegion region, int maxWidth, Func<HexCell, string> glyph) =>
-        DrawPanel(title, MapBounds.FromHex(region), maxWidth, cell => region.Contains(cell) ? glyph(cell) : " ");
+    private static Panel DrawPanel(string title, HexRegion region, int maxWidth, Color border, Func<HexCell, string> glyph) =>
+        DrawPanel(title, MapBounds.FromHex(region), maxWidth, border, cell => region.Contains(cell) ? glyph(cell) : " ");
 
-    private static Panel DrawPanel(string title, MapBounds bounds, int maxWidth, Func<HexCell, string> glyph)
+    private static Panel DrawPanel(string title, MapBounds bounds, int maxWidth, Color border, Func<HexCell, string> glyph)
     {
         var text = new StringBuilder();
         for (int row = bounds.Top; row <= bounds.Bottom; row++)
@@ -194,7 +208,7 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
         }
 
         int width = Math.Min(maxWidth, Math.Max(title.Length + 4, bounds.Width + 4));
-        return new Panel(new Markup(text.ToString())) { Width = width }
+        return new Panel(new Markup(text.ToString())) { Width = width, BorderStyle = new Style(border) }
             .Header(title)
             .Border(BoxBorder.Rounded);
     }
@@ -207,7 +221,7 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
 
     private static string DrawScale(int width)
     {
-        string fullScale = "Penguins per hex  "
+        string fullScale = "[bold]Penguins per hex[/]  "
             + string.Join("  ", HeatmapScale.Select(band => $"{DensityGlyph(band.Maximum)} {band.Label}"));
         if (width >= Markup.Remove(fullScale).Length)
         {
@@ -218,14 +232,14 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
         return width >= 12 ? $"0 {glyphs} 16+" : glyphs;
     }
 
-    private int FrameContentWidth => Math.Max(1, console.Profile.Width - 4);
+    private int IterationContentWidth => Math.Max(1, console.Profile.Width - 6);
 
     private Layout GetLayout(bool interactive)
     {
-        int width = FrameContentWidth;
+        int width = IterationContentWidth;
         int terminalHeight = console.Profile.Height > 0 ? console.Profile.Height : 24;
-        // Reserve two border rows and two simulation details rows.
-        int height = Math.Max(1, terminalHeight - 4);
+        // Reserve two rows for each frame and two for the simulation details.
+        int height = Math.Max(1, terminalHeight - 6);
         bool sideBySide = width >= 38;
         bool showControls = interactive && width >= 26 && height >= (sideBySide ? 9 : 14);
         bool showScale = width >= 6 && height >= (sideBySide ? 7 : 11);

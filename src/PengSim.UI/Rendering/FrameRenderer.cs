@@ -18,9 +18,6 @@ internal static class FrameRenderer
     private const int LegendTitleWidth = 18;
     private const int LegendSwatchSpacing = 2;
 
-    // One example population for each of the ten fixed heatmap colors.
-    private static readonly int[] LegendCounts = [0, 1, 2, 4, 7, 15, 31, 63, 127, 128];
-
     public static string[] RenderRows(
         HexEnvironment environment,
         HexFootprint footprint,
@@ -69,7 +66,7 @@ internal static class FrameRenderer
         screen.Text(layout.Map.X, legendY, "Penguins per hex",
             HeatmapPalette.DefaultColor, LegendTitleWidth);
 
-        for (var i = 0; i < LegendCounts.Length; i++)
+        for (var i = 0; i < HeatmapPalette.DensityBands.Length; i++)
         {
             var x = layout.Map.X + LegendTitleWidth + i * LegendSwatchSpacing;
             if (x >= layout.Map.X + layout.Map.Width)
@@ -77,7 +74,7 @@ internal static class FrameRenderer
                 break;
             }
 
-            screen.Put(x, legendY, FromPaint(HeatmapPalette.GetDensityPaint(LegendCounts[i])));
+            screen.Put(x, legendY, HeatmapPalette.DensityBands[i]);
         }
 
         var (column, row) = footprint.ToOffset(camera.Center);
@@ -170,18 +167,13 @@ internal static class FrameRenderer
         {
             var row = bounds.Top + y;
 
-            for (var x = 0; x < bounds.Width; x++)
+            // Cell centers satisfy mapX = 2*q + row. Start on the matching
+            // parity and step over the blank column between neighboring hexes.
+            var firstColumn = (row - bounds.Left) & 1;
+            for (var x = firstColumn; x < bounds.Width; x += 2)
             {
                 var mapX = bounds.Left + x;
-                // Invert screenX = 2*q+r to recover q; odd values fall
-                // between cell centers and must remain empty spacer columns.
-                var axialColumn = mapX - row;
-                if ((axialColumn & 1) != 0)
-                {
-                    continue;
-                }
-
-                var cell = new HexCell(axialColumn / 2, row);
+                var cell = new HexCell((mapX - row) / 2, row);
                 var paint = GetCellPaint(environment, footprint, heatmap, world, level, cell);
 
                 if (cameraCenter is { } center && cell == center)
@@ -207,17 +199,18 @@ internal static class FrameRenderer
         HexEnvironment environment, HexFootprint footprint, HexHeatmap heatmap,
         HexRegion world, int level, HexCell cell)
     {
-        if (world.Contains(cell))
+        var distance = cell.DistanceTo(world.Center);
+        if (distance <= world.Radius)
         {
             var population = level == 0
                 ? BasePopulation(environment, footprint, cell)
                 : heatmap.GetPopulation(level, cell);
-            return FromPaint(HeatmapPalette.GetDensityPaint(population));
+            return HeatmapPalette.GetDensityPaint(population);
         }
 
-        return cell.DistanceTo(world.Center) == world.Radius + 1
-            ? FromPaint(HeatmapPalette.WorldEdgePaint)
-            : FromPaint(HeatmapPalette.OutsidePaint);
+        return distance == world.Radius + 1
+            ? HeatmapPalette.WorldEdgePaint
+            : HeatmapPalette.OutsidePaint;
     }
 
     private static int BasePopulation(
@@ -226,8 +219,5 @@ internal static class FrameRenderer
         var (column, row) = footprint.ToOffset(cell);
         return environment[column, row] == HexEnvironment.EmptyCell ? 0 : 1;
     }
-
-    private static TerminalPixel FromPaint(MapPaint paint) =>
-        new(paint.Glyph, paint.Color);
 
 }

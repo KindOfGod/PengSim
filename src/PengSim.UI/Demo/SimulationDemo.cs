@@ -2,6 +2,7 @@ using PengSim.BL.Contracts;
 using PengSim.BL.Model;
 using PengSim.UI.Map;
 using PengSim.UI.Rendering;
+using HexEnvironment = PengSim.BL.Model.Environment;
 
 namespace PengSim.UI.Demo;
 
@@ -27,15 +28,14 @@ internal sealed class SimulationDemo(ISimulationEngine engine, EnvironmentDrawer
         const int clusterRadius = 24;
 
         var random = new Random(seed);
-        var positions = new HashSet<(int Column, int Row)>();
         (int Column, int Row)[] clusters = [(45, 55), (115, 55), (80, 80), (45, 105), (115, 105)];
 
         foreach (var (column, row) in clusters)
         {
-            var targetCount = positions.Count + penguinsPerCluster;
+            var targetCount = simulation.Penguins.Count + penguinsPerCluster;
 
             // A sample only counts when it is inside the cluster and occupies a new playable cell.
-            while (positions.Count < targetCount)
+            while (simulation.Penguins.Count < targetCount)
             {
                 var dx = random.Next(-clusterRadius, clusterRadius + 1);
                 var dy = random.Next(-clusterRadius, clusterRadius + 1);
@@ -44,7 +44,7 @@ internal sealed class SimulationDemo(ISimulationEngine engine, EnvironmentDrawer
 
                 if (dx * dx + dy * dy <= clusterRadius * clusterRadius
                     && footprint.Contains(x, y)
-                    && positions.Add((x, y)))
+                    && simulation.Environment[x, y] == HexEnvironment.EmptyCell)
                 {
                     simulation.AddPenguin(x, y);
                 }

@@ -10,6 +10,8 @@ Install the .NET 10 SDK, then run in an ANSI-capable terminal:
 dotnet run --project src/PengSim.UI
 ```
 
+If input or output is redirected, the demo prints one plain-text overview and exits.
+
 ## Visualization
 
 The **main map** shows the area you are looking at. The **minimap** shows the whole world, with yellow hexes outlining your current view.
@@ -22,7 +24,7 @@ The **main map** shows the area you are looking at. The **minimap** shows the wh
 | Key | Action |
 | --- | --- |
 | `+` / `-` | Zoom in / out |
-| Arrow keys or WASD | Move the view |
+| Arrow keys or WASD | Move the view while zoomed in |
 | Shift + arrow keys | Move one cell at a time |
 | `R` | Reset view |
 | `Q` | Quit |
@@ -32,3 +34,5 @@ The **main map** shows the area you are looking at. The **minimap** shows the wh
 - `src/PengSim.BL/` — simulation logic
 - `src/PengSim.UI/` — terminal visualization and demo
 - [How rendering works](src/PengSim.UI/RENDERING.md) — short technical overview
+
+The engine creates an empty simulation. Each simulation owns a grid of penguin IDs and a dictionary of penguins keyed by ID. Zero means an empty cell. `Simulation.AddPenguin` assigns the next ID and updates both structures. The demo supplies the hexagonal footprint and places the colonies.

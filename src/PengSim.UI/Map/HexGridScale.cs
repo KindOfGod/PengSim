@@ -17,8 +17,6 @@ internal static class HexGridScale
         ArgumentOutOfRangeException.ThrowIfNegative(level);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(level, 30);
 
-        // The display index is not BL's seven-child hierarchy: it is a
-        // world-aligned hex lattice scaled by 2^level, with no rotation.
         var scale = (double)(1L << level);
         var q = cell.Q / scale;
         var r = cell.R / scale;
@@ -44,10 +42,6 @@ internal static class HexGridScale
         else if (dr > ds)
         {
             rr = -rq - rs;
-        }
-        else
-        {
-            rs = -rq - rr;
         }
 
         return new HexCell((int)rq, (int)rr);

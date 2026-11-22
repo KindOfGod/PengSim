@@ -1,25 +1,11 @@
 # How the map is drawn
 
-PengSim's world and cells are **hexagonal**. The main display and minimap are **rectangular windows** looking at that world.
+The simulation stores occupancy by column and row. `HexFootprint` converts these positions to axial hex coordinates centered on the playable world. Both terminal panels use rectangular windows. In either panel, a hex at `(q, r)` appears at column `2*q + r` and row `r`, leaving a blank column between neighbors.
 
-```mermaid
-flowchart LR
-    A["Simulation iteration"] --> B["Rebuild hex heatmap counts"]
-    B --> C["Draw visible hexes"]
-    D["Pan or zoom"] --> C
-    C --> E["Update changed terminal rows"]
-```
+## From a simulation to a frame
 
-## Zoom and colors
+1. At startup, `HexHeatmap.Rebuild` scans the playable cells. For each occupied cell, `HexGridScale.ToLevel` rounds its position to the nearest bucket on each coarser lattice. The spacing between bucket centers doubles at every level. Each level stores counts only for occupied buckets.
+2. `FrameLayout` sizes the panels and chooses the overview level. The minimap stays at that level as the main view zooms in. At L0 the renderer reads occupancy directly from the grid. Coarser views read the cached counts.
+3. `FrameRenderer` draws the visible hexes, minimap selection, legend, and text into a character buffer. In an interactive terminal, `TerminalPresenter` compares the encoded rows with the previous frame and sends changed rows in one write.
 
-At **L0**, each symbol is one map cell. Zooming out groups nearby cells into larger **hexagonal buckets**. Their color shows penguin density: blue is low, purple is medium, and red is high. Zooming in reveals smaller buckets again.
-
-The minimap stays fixed. **Yellow hexes** outline the main view; **teal dots** mark the world boundary.
-
-## Rendering
-
-1. `HexHeatmap.Rebuild(environment)` refreshes counts after a simulation iteration. The current static demo calls it once at startup.
-2. `FrameLayout` calculates panel sizes; `FrameRenderer` draws visible hexes using the reusable `TerminalBuffer` helper.
-3. `TerminalPresenter` writes changed terminal rows in one update.
-
-Panning and zooming reuse the same heatmap snapshot. Keyboard input is handled by `EnvironmentDrawer`.
+The demo displays a static iteration. Panning, zooming, and resizing reuse its counts. If an iteration changes occupancy, rebuild the heatmap before drawing that iteration so the overview and L0 show the same population.

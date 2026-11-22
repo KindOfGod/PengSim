@@ -20,10 +20,14 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
     [
         (0, EmptyCellColor, "0"),
         (1, PenguinColor, "1"),
-        (3, "#5f5fd7", "2–3"),
-        (7, "#875faf", "4–7"),
-        (15, "#d75f87", "8–15"),
-        (int.MaxValue, "#ff0000", "16+"),
+        (2, "#5f87d7", "2"),
+        (4, "#5f5fd7", "3–4"),
+        (7, "#875fd7", "5–7"),
+        (15, "#af5faf", "8–15"),
+        (31, "#d75faf", "16–31"),
+        (63, "#d75f87", "32–63"),
+        (127, "#d75f5f", "64–127"),
+        (int.MaxValue, "#ff0000", "128+"),
     ];
 
     public void Show(
@@ -230,14 +234,15 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
     private static string DrawScale(int width)
     {
         string fullScale = "[bold]Penguins per hex[/]  "
-            + string.Join("  ", HeatmapScale.Select(band => $"{DensityGlyph(band.Maximum)} {band.Label}"));
+            + string.Join(" ", HeatmapScale.Select(band => $"{DensityGlyph(band.Maximum)}{band.Label}"));
         if (width >= Markup.Remove(fullScale).Length)
         {
             return fullScale;
         }
 
         string glyphs = string.Concat(HeatmapScale.Select(band => DensityGlyph(band.Maximum)));
-        return width >= 12 ? $"0 {glyphs} 16+" : glyphs;
+        string compactScale = $"{HeatmapScale[0].Label} {glyphs} {HeatmapScale[^1].Label}";
+        return width >= Markup.Remove(compactScale).Length ? compactScale : glyphs;
     }
 
     private int IterationContentWidth => Math.Max(1, console.Profile.Width - 6);
@@ -250,7 +255,7 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
         int height = Math.Max(1, terminalHeight - 6);
         bool sideBySide = width >= 38;
         bool showControls = interactive && width >= 26 && height >= (sideBySide ? 9 : 14);
-        bool showScale = width >= 6 && height >= (sideBySide ? 7 : 11);
+        bool showScale = width >= HeatmapScale.Length && height >= (sideBySide ? 7 : 11);
         int mapHeight = height - (showControls ? 2 : 0) - (showScale ? 1 : 0);
         int miniWidth = sideBySide ? width * 48 / 100 : width;
         int sideHeight = sideBySide ? mapHeight : Math.Max(6, mapHeight / 2);

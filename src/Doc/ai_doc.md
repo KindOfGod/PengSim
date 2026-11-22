@@ -112,3 +112,8 @@ Add an entry here when making a change or deciding how the simulation is designe
 ## 2026-11-22 — Blue-to-red density scale
 
 - The lowest nonzero density shares the single-penguin blue used at L0. The heatmap and legend progress through violet and rose to red at the highest density.
+
+## 2026-11-22 — Finer density bands
+
+- The heatmap has nine occupied density bands plus grey for empty cells. The first four bands distinguish small groups of one to seven penguins. The larger ranges extend to 128 or more so dense clusters remain distinguishable in the overview.
+- Counts use the same scale across the heatmap, minimap, and legend. The compact legend gets its endpoints from the density bands.

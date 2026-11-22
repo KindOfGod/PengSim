@@ -75,3 +75,8 @@ Add an entry here when making a change or deciding how the simulation is designe
 
 - Both panels stay visible at every zoom level. The main panel uses the largest hex that fits the available rows and columns. Zooming switches between stored aggregation levels while the panel size stays fixed. A magenta ring distinguishes the map outline from grey off-map cells.
 - The UI keeps coordinates, the camera, and aggregation in `Map`, terminal drawing in `Rendering`, and sample data in `Demo`. `Program` wires them together at the project root.
+
+## 2026-11-22 — Shared overview resolution
+
+- The minimap has more room, especially on wide terminals. Both panels use the finest full-world aggregation level that fits them. The minimap keeps that level while the main map zooms in.
+- When space is tight, the viewport marker uses the room around the overview. The full-world heatmap and the marker's hex shape stay visible at the edges.

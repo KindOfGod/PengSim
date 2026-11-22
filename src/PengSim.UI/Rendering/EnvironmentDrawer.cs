@@ -39,7 +39,7 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
                 context.Refresh();
                 while (true)
                 {
-                    if (Console.KeyAvailable && !Navigate(Console.ReadKey(intercept: true), camera, heatmap, footprint.Radius))
+                    if (Console.KeyAvailable && !Navigate(Console.ReadKey(intercept: true), camera, heatmap))
                     {
                         return;
                     }
@@ -68,7 +68,7 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
     {
         var layout = GetLayout(interactive);
         int detailRadius = Math.Max(0, layout.MainRadius - 1);
-        var overview = heatmap.FitWorld(detailRadius);
+        var overview = FitOverview(heatmap, layout);
         int level = camera.Level ?? overview.Level;
         var view = camera.Level.HasValue
             ? new HexRegion(camera.Center.Ancestor(level), detailRadius)
@@ -98,19 +98,20 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
             return environment[column, row] == HexEnvironment.EmptyCell ? "⬡" : "[blue]⬢[/]";
         });
 
-        var minimap = FitMinimap(heatmap, layout, footprint.Radius);
-        var miniCounts = heatmap.GetCounts(minimap.Level);
-        int markerRadius = MarkerRadius(detailRadius, level, minimap.Level, minimap.Margin);
-        var marker = new HexRegion(camera.Center.Ancestor(minimap.Level), markerRadius);
-        var miniBounds = minimap.Region with { Radius = minimap.Region.Radius + minimap.Margin };
-        var mini = DrawPanel($"Minimap · L{minimap.Level}", miniBounds, layout.MiniWidth, cell =>
+        int largestMarker = MarkerRadius(detailRadius, overview.Level - 1, overview.Level, layout.MiniRadius);
+        int margin = Math.Min(largestMarker, layout.MiniRadius - overview.Region.Radius);
+        var miniCounts = heatmap.GetCounts(overview.Level);
+        int markerRadius = MarkerRadius(detailRadius, level, overview.Level, margin);
+        var marker = new HexRegion(camera.Center.Ancestor(overview.Level), markerRadius);
+        var miniBounds = overview.Region with { Radius = overview.Region.Radius + margin };
+        var mini = DrawPanel($"Minimap · L{overview.Level}", miniBounds, layout.MiniWidth, cell =>
         {
             if (camera.Level.HasValue && marker.Contains(cell))
             {
                 return DensityGlyph(miniCounts.GetValueOrDefault(cell), highlighted: true);
             }
 
-            return minimap.Region.Contains(cell) ? DensityGlyph(miniCounts.GetValueOrDefault(cell)) : " ";
+            return overview.Region.Contains(cell) ? DensityGlyph(miniCounts.GetValueOrDefault(cell)) : " ";
         });
 
         IRenderable maps;
@@ -210,8 +211,8 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
         bool showControls = interactive && width >= 26 && height >= (sideBySide ? 7 : 11);
         bool showScale = width >= 6 && height >= (sideBySide ? 5 : 9);
         int mapHeight = height - (showControls ? 2 : 0) - (showScale ? 1 : 0);
-        int miniWidth = sideBySide ? Math.Clamp(width / 2 - 3, 15, 37) : width;
-        int miniHeight = sideBySide ? mapHeight : Math.Max(3, mapHeight / 3);
+        int miniWidth = sideBySide ? width * 48 / 100 : width;
+        int miniHeight = sideBySide ? mapHeight : Math.Max(3, (mapHeight - 2) / 2);
         int mainWidth = sideBySide ? width - miniWidth - 1 : width;
         int mainHeight = sideBySide ? mapHeight : mapHeight - miniHeight;
 
@@ -225,26 +226,10 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
     private static int MarkerRadius(int radius, int level, int miniLevel, int margin) =>
         Math.Min(margin, (int)Math.Round(radius * Math.Pow(7, (level - miniLevel) / 2.0)));
 
-    private static (int Level, HexRegion Region, int Margin) FitMinimap(HexHeatmap heatmap, Layout layout, int worldRadius)
-    {
-        int detailRadius = Math.Max(0, layout.MainRadius - 1);
-        int firstZoomLevel = heatmap.FitWorld(detailRadius).Level - 1;
-        double largestViewRadius = Math.Min(worldRadius, detailRadius * Math.Pow(7, firstZoomLevel / 2.0));
-        int availableRadius = layout.MiniRadius;
-        while (true)
-        {
-            var overview = heatmap.FitWorld(availableRadius);
-            int margin = (int)Math.Round(largestViewRadius / Math.Pow(7, overview.Level / 2.0));
-            if (overview.Region.Radius + margin <= layout.MiniRadius || overview.Region.Radius == 0)
-            {
-                return (overview.Level, overview.Region, Math.Min(margin, layout.MiniRadius - overview.Region.Radius));
-            }
+    private static (int Level, HexRegion Region) FitOverview(HexHeatmap heatmap, Layout layout) =>
+        heatmap.FitWorld(Math.Min(Math.Max(0, layout.MainRadius - 1), layout.MiniRadius));
 
-            availableRadius = overview.Region.Radius - 1;
-        }
-    }
-
-    private bool Navigate(ConsoleKeyInfo input, MapCamera camera, HexHeatmap heatmap, int worldRadius)
+    private bool Navigate(ConsoleKeyInfo input, MapCamera camera, HexHeatmap heatmap)
     {
         if (input.Key == ConsoleKey.Q)
         {
@@ -267,7 +252,7 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
         var layout = GetLayout(interactive: true);
         if (camera.Level.HasValue && direction != (0, 0))
         {
-            var overview = FitMinimap(heatmap, layout, worldRadius);
+            var overview = FitOverview(heatmap, layout);
             if (input.Modifiers.HasFlag(ConsoleModifiers.Shift) || overview.Region.Radius == 0)
             {
                 camera.PanFine(direction.Item1, direction.Item2);
@@ -280,7 +265,7 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
 
         if (input.KeyChar is '+' or '-')
         {
-            int overviewLevel = heatmap.FitWorld(Math.Max(0, layout.MainRadius - 1)).Level;
+            int overviewLevel = FitOverview(heatmap, layout).Level;
             if (input.KeyChar == '+')
             {
                 camera.ZoomIn(overviewLevel);

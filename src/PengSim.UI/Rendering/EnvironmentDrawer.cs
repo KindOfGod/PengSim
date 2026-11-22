@@ -19,10 +19,10 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
     private static readonly (int Maximum, string Color, string Label)[] HeatmapScale =
     [
         (0, EmptyCellColor, "0"),
-        (1, "#ffffaf", "1"),
-        (3, "#ffd787", "2–3"),
-        (7, "#ffaf5f", "4–7"),
-        (15, "#ff875f", "8–15"),
+        (1, PenguinColor, "1"),
+        (3, "#5f5fd7", "2–3"),
+        (7, "#875faf", "4–7"),
+        (15, "#d75f87", "8–15"),
         (int.MaxValue, "#ff0000", "16+"),
     ];
 

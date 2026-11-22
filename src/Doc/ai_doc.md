@@ -108,3 +108,7 @@ Add an entry here when making a change or deciding how the simulation is designe
 ## 2026-11-22 — Warm density scale
 
 - The heatmap and legend use pale yellow for low nonzero density, orange for middle ranges, and red for the highest density. Empty cells are neutral grey. Individual penguins at L0 remain blue.
+
+## 2026-11-22 — Blue-to-red density scale
+
+- The lowest nonzero density shares the single-penguin blue used at L0. The heatmap and legend progress through violet and rose to red at the highest density.

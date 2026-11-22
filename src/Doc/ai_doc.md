@@ -99,3 +99,8 @@ Add an entry here when making a change or deciding how the simulation is designe
 
 - The heatmap, minimap, Information panel, and density legend sit inside a separate iteration frame. The demo displays iteration 0. The simulation metadata and keyboard shortcuts sit outside that frame, leaving room for playback controls when playback is implemented.
 - Frame colors distinguish the application, iteration, main map, minimap, and Information panel. Heatmap density colors retain their existing meaning.
+
+## 2026-11-22 — Restrained terminal palette
+
+- Neutral borders group panels. Teal marks the app title, the active iteration frame, and the map outline.
+- The density scale progresses from medium blue to pale ice blue as the population rises. Empty cells stay grey. The minimap viewport keeps its diamond glyph and uses a dark neutral background, leaving its density colors readable.

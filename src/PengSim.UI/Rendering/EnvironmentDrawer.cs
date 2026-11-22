@@ -8,14 +8,21 @@ namespace PengSim.UI.Rendering;
 
 internal sealed class EnvironmentDrawer(IAnsiConsole console)
 {
+    private const string Accent = "#5fd7af";
+    private const string EmptyCellColor = "#767676";
+    private const string ViewportBackground = "#303030";
+    private static readonly Style PanelBorder = Style.Parse(EmptyCellColor);
+    private static readonly Style FrameBorder = Style.Parse("#949494");
+    private static readonly Style ActiveBorder = Style.Parse(Accent);
+
     private static readonly (int Maximum, string Color, string Label)[] HeatmapScale =
     [
-        (0, "grey", "0"),
-        (1, "blue", "1"),
-        (3, "aqua", "2–3"),
-        (7, "green", "4–7"),
-        (15, "yellow", "8–15"),
-        (int.MaxValue, "red", "16+"),
+        (0, EmptyCellColor, "0"),
+        (1, "#0087d7", "1"),
+        (3, "#00afff", "2–3"),
+        (7, "#5fafff", "4–7"),
+        (15, "#87d7ff", "8–15"),
+        (int.MaxValue, "#d7ffff", "16+"),
     ];
 
     public void Show(
@@ -25,9 +32,9 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
         var heatmap = new HexHeatmap(environment, footprint);
         var camera = new MapCamera(footprint);
         var details = new Rows(
-            new Markup($"[bold aqua]{Emoji.Known.Penguin}  Name:[/] {Markup.Escape(simulationName)}")
+            new Markup($"[bold]{Emoji.Known.Penguin}  Name:[/] {Markup.Escape(simulationName)}")
                 { Overflow = Overflow.Ellipsis },
-            new Markup($"[bold yellow]{Emoji.Known.FileFolder}  Path:[/] {Markup.Escape(outputPath ?? "Unsaved")}")
+            new Markup($"[bold]{Emoji.Known.FileFolder}  Path:[/] {Markup.Escape(outputPath ?? "Unsaved")}")
                 { Overflow = Overflow.Ellipsis });
         if (Console.IsInputRedirected || Console.IsOutputRedirected || !console.Profile.Capabilities.Interactive)
         {
@@ -86,26 +93,26 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
         var counts = level > 0 ? heatmap.GetCounts(level) : null;
         var worldAtLevel = level > 0 ? heatmap.GetRegion(level) : footprint.Region;
 
-        var main = DrawPanel(level == 0 ? "Hex grid · L0" : $"Heatmap · L{level}", drawRegion, layout.MainWidth, Color.Aqua, cell =>
+        var main = DrawPanel(level == 0 ? "Hex grid · L0" : $"Heatmap · L{level}", drawRegion, layout.MainWidth, cell =>
         {
             int distance = cell.DistanceTo(view.Center);
             if (distance > view.Radius)
             {
-                return distance == view.Radius + 1 ? "[fuchsia]·[/]" : " ";
+                return distance == view.Radius + 1 ? $"[{Accent}]·[/]" : " ";
             }
 
             if (counts is not null)
             {
-                return worldAtLevel.Contains(cell) ? DensityGlyph(counts.GetValueOrDefault(cell)) : "[grey]·[/]";
+                return worldAtLevel.Contains(cell) ? DensityGlyph(counts.GetValueOrDefault(cell)) : $"[{EmptyCellColor}]·[/]";
             }
 
             if (!worldAtLevel.Contains(cell))
             {
-                return "[grey]·[/]";
+                return $"[{EmptyCellColor}]·[/]";
             }
 
             var (column, row) = footprint.ToOffset(cell);
-            return environment[column, row] == HexEnvironment.EmptyCell ? "⬡" : "[blue]⬢[/]";
+            return DensityGlyph(environment[column, row] == HexEnvironment.EmptyCell ? 0 : 1);
         });
 
         int largestMarker = MarkerRadius(detailRadius, overview.Level - 1, overview.Level, layout.MiniRadius);
@@ -119,7 +126,7 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
             miniBounds = miniBounds.Union(MapBounds.FromHex(marker));
         }
 
-        var mini = DrawPanel($"Minimap · L{overview.Level}", miniBounds, layout.MiniWidth, Color.Green, cell =>
+        var mini = DrawPanel($"Minimap · L{overview.Level}", miniBounds, layout.MiniWidth, cell =>
         {
             if (camera.Level.HasValue && marker.Contains(cell))
             {
@@ -132,7 +139,7 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
         int informationRows = Math.Max(1, layout.SideHeight - (miniBounds.Height + 2) - 2);
         string emptyInformation = string.Join("\n", Enumerable.Repeat(" ", informationRows));
         var information = new Panel(new Text(emptyInformation))
-            { Width = mini.Width, BorderStyle = new Style(Color.Yellow) }
+            { Width = mini.Width, BorderStyle = PanelBorder }
             .Header("Information")
             .Border(BoxBorder.Rounded);
         var side = new Rows(mini, information);
@@ -172,26 +179,26 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
             string controls = width >= 65
                 ? "Arrows/WASD pan  Shift+arrows fine  +/- zoom  R reset  Q quit"
                 : width >= 32 ? "Arrows  Shift: fine  +/-  R  Q" : "WASD +/- R Q";
-            iterationContent.Add(new Text(position, new Style(Color.Aqua)));
-            content.Add(new Text(controls, new Style(Color.Yellow)));
+            iterationContent.Add(new Text(position));
+            content.Add(new Text(controls));
         }
 
         var iterationPanel = new Panel(new Rows(iterationContent))
-            { Padding = new Padding(0, 0), BorderStyle = new Style(Color.Fuchsia) }
+            { Padding = new Padding(0, 0), BorderStyle = ActiveBorder }
             .Header($"Iteration {iteration}")
             .Border(BoxBorder.Rounded);
         content.Insert(1, iterationPanel);
 
         return new Panel(new Rows(content))
-            { Padding = new Padding(1, 0), BorderStyle = new Style(Color.Blue) }
-            .Header("[bold aqua]Penguine Simulation[/]")
+            { Padding = new Padding(1, 0), BorderStyle = FrameBorder }
+            .Header($"[bold {Accent}]Penguine Simulation[/]")
             .Border(BoxBorder.Rounded);
     }
 
-    private static Panel DrawPanel(string title, HexRegion region, int maxWidth, Color border, Func<HexCell, string> glyph) =>
-        DrawPanel(title, MapBounds.FromHex(region), maxWidth, border, cell => region.Contains(cell) ? glyph(cell) : " ");
+    private static Panel DrawPanel(string title, HexRegion region, int maxWidth, Func<HexCell, string> glyph) =>
+        DrawPanel(title, MapBounds.FromHex(region), maxWidth, cell => region.Contains(cell) ? glyph(cell) : " ");
 
-    private static Panel DrawPanel(string title, MapBounds bounds, int maxWidth, Color border, Func<HexCell, string> glyph)
+    private static Panel DrawPanel(string title, MapBounds bounds, int maxWidth, Func<HexCell, string> glyph)
     {
         var text = new StringBuilder();
         for (int row = bounds.Top; row <= bounds.Bottom; row++)
@@ -208,7 +215,7 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
         }
 
         int width = Math.Min(maxWidth, Math.Max(title.Length + 4, bounds.Width + 4));
-        return new Panel(new Markup(text.ToString())) { Width = width, BorderStyle = new Style(border) }
+        return new Panel(new Markup(text.ToString())) { Width = width, BorderStyle = PanelBorder }
             .Header(title)
             .Border(BoxBorder.Rounded);
     }
@@ -216,7 +223,7 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
     private static string DensityGlyph(int count, bool highlighted = false)
     {
         string color = HeatmapScale.First(band => count <= band.Maximum).Color;
-        return highlighted ? $"[{color} on white]◈[/]" : $"[{color}]{(count == 0 ? "⬡" : "⬢")}[/]";
+        return highlighted ? $"[{color} on {ViewportBackground}]◈[/]" : $"[{color}]{(count == 0 ? "⬡" : "⬢")}[/]";
     }
 
     private static string DrawScale(int width)

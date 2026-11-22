@@ -1,6 +1,6 @@
 # PengSim
 
-PengSim is a .NET 10 terminal application for exploring a penguin simulation on a **hexagonal map**. Run demo scatters 5,000 penguins across a hexagonal board of radius 150 (301 hexes across the center, 67,951 playable cells) and calculates 1,000 iterations. A progress bar shows the completed iterations and average iterations per second. The viewer opens paused at the starting positions.
+PengSim is a .NET 10 terminal application for exploring a penguin simulation on a **hexagonal map**. Run demo scatters 5,000 penguins across a hexagonal board of radius 150 (301 hexes across the center, 67,951 playable cells) and calculates 1,000 iterations. A progress bar shows the completed iterations and average iterations per second. When generation finishes, review the elapsed time, speed, and simulation details. Press A to analyze the run from its starting positions.
 
 ## Run
 

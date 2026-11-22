@@ -13,17 +13,16 @@ internal sealed class SimulationDemo(ISimulationEngine engine, EnvironmentDrawer
     public void Run()
     {
         var interactive = !Console.IsInputRedirected && !Console.IsOutputRedirected;
-        if (interactive)
-        {
-            Console.WriteLine("PengSim\n\n1  Create simulation (coming soon)\n2  Run demo\nQ  Quit");
-            while (true)
-            {
-                var key = Console.ReadKey(intercept: true);
-                if (key.Key == ConsoleKey.Q) return;
-                if (key.KeyChar == '2') break;
-            }
-        }
+        using var screen = interactive ? new DemoScreen() : null;
+        const uint accent = HeatmapPalette.Accent;
+        const uint normal = HeatmapPalette.DefaultColor;
+        if (screen is not null && !DemoScreen.WaitFor('2', () => screen.Draw("Main menu",
+            ("Create simulation (coming soon)", 0x949494),
+            ("[2] Run demo", accent),
+            ("", normal),
+            ("[Q] Quit", normal)))) return;
 
+        var total = Stopwatch.StartNew();
         var footprint = new HexFootprint(Radius: 150);
         var simulation = engine.CreateSimulation(footprint.Size, footprint.Size);
         var cells = footprint.Region.Cells().ToArray();
@@ -36,21 +35,41 @@ internal sealed class SimulationDemo(ISimulationEngine engine, EnvironmentDrawer
 
         var clock = Stopwatch.StartNew();
         var nextUpdate = TimeSpan.Zero;
-        if (interactive) Console.WriteLine("\nCalculating demo");
+
         for (var step = 1; step <= Steps; step++)
         {
             simulation.Step();
             var elapsed = clock.Elapsed;
             if (interactive && (elapsed >= nextUpdate || step == Steps))
             {
-                var filled = 20 * step / Steps;
-                Console.Write($"\r[{new string('#', filled)}{new string('-', 20 - filled)}] "
-                    + $"{step,4}/{Steps}  {step / elapsed.TotalSeconds,7:F1} iterations/s");
+                DrawProgress(step, elapsed, completed: false);
                 nextUpdate = elapsed + TimeSpan.FromMilliseconds(100);
             }
         }
 
-        if (interactive) Console.WriteLine();
+        clock.Stop();
+        total.Stop();
+        if (screen is not null && !DemoScreen.WaitFor('A',
+            () => DrawProgress(Steps, clock.Elapsed, completed: true))) return;
+
         drawer.Show(simulation.Frames, footprint, "Penguin demo");
+
+        void DrawProgress(int step, TimeSpan elapsed, bool completed)
+        {
+            const int barWidth = 22;
+            var filled = barWidth * step / Steps;
+            var bar = new string('█', filled) + new string('░', barWidth - filled);
+            screen!.Draw(completed ? "Demo complete" : "Generating demo",
+                ($"{bar}  {step * 100 / Steps}%", accent),
+                ($"Steps      {step:N0} / {Steps:N0}", normal),
+                ($"Elapsed    {total.Elapsed.TotalSeconds:F3} s", normal),
+                ($"Speed      {step / elapsed.TotalSeconds:N1} steps/s", normal),
+                ("", normal),
+                ($"Penguins   {simulation.Penguins.Count:N0}", normal),
+                ($"Map        Radius {footprint.Radius} · {cells.Length:N0} hexes", normal),
+                ($"Frames     {simulation.Frames.Count:N0} in memory", normal),
+                ("", normal),
+                (completed ? "[A] Analyze    [Q] Quit" : "Calculating steps…", accent));
+        }
     }
 }

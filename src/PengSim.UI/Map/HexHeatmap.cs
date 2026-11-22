@@ -2,45 +2,112 @@ using HexEnvironment = PengSim.BL.Model.Environment;
 
 namespace PengSim.UI.Map;
 
-/// <summary>Builds the density and camera landing cells for each parent level of a static snapshot.</summary>
+/// <summary>
+/// Sparse multiresolution population index over world-aligned hexagon buckets.
+/// A bucket coordinate is calculated directly with HexGridScale.ToLevel.
+/// Empty buckets require no storage; each population change touches only one
+/// bucket at every zoom level.
+/// </summary>
 internal sealed class HexHeatmap
 {
+    // One sparse dictionary per zoom level. Only buckets containing penguins
+    // have entries; an absent key represents a valid zero population.
     private readonly List<Level> _levels = [];
 
-    /// <summary>Precomputes the hierarchy from the base cells up to the single enclosing parent.</summary>
     public HexHeatmap(HexEnvironment environment, HexFootprint footprint)
     {
-        var (occupied, groups) = GroupBaseCells(environment, footprint);
-
-        // Each group carries its base cells forward so counts and landing points stay exact.
-        while (true)
+        if (environment.Width != footprint.Size || environment.Height != footprint.Size)
         {
-            _levels.Add(BuildLevel(_levels.Count + 1, groups, occupied));
+            throw new ArgumentException("Environment must match the hexagonal display footprint.", nameof(environment));
+        }
 
-            if (groups.Count == 1)
+        // Build only the world extents, not cell-to-parent membership arrays.
+        // Extrema on each of the six world sides take O(radius * levels),
+        // instead of visiting every cell at every level.
+        // Each step doubles the display hex size. Stop when the full map
+        // fits in one bucket; there is no reason to allocate coarser levels.
+        const int MaxZoomLevel = 30;
+        for (var level = 1; level <= MaxZoomLevel; level++)
+        {
+            var radius = GetCoarseRadius(footprint.Radius, level);
+            _levels.Add(new Level(new HexRegion(default, radius), new Dictionary<HexCell, int>()));
+            if (radius == 0)
             {
                 break;
             }
+        }
 
-            groups = GroupParents(groups);
+        // One initial occupancy scan is necessary with the current Environment
+        // API, which exposes an array but no collection of occupied positions.
+        // Only *occupied* cells contribute to the sparse aggregation index.
+        foreach (var cell in footprint.Region.Cells())
+        {
+            var (column, row) = footprint.ToOffset(cell);
+            if (environment[column, row] != HexEnvironment.EmptyCell)
+            {
+                ChangePopulation(cell, 1);
+            }
         }
     }
 
-    /// <summary>Finds a playable base cell near the geometric center of the parent, if it exists.</summary>
-    public HexCell? FindBaseCell(HexCell parent, int level) =>
-        _levels[level - 1].LandingCells.TryGetValue(parent, out var cell) ? cell : null;
+    /// <summary>Number of coarse display levels; L0 is the raw hex grid.</summary>
+    public int LevelCount => _levels.Count;
 
-    /// <summary>Returns the cached penguin counts keyed by parent coordinates at the given level.</summary>
-    public IReadOnlyDictionary<HexCell, int> GetCounts(int level) => _levels[level - 1].Counts;
+    /// <summary>Constant-time population lookup; absent buckets have zero penguins.</summary>
+    public int GetPopulation(int level, HexCell cell)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(level);
+        return _levels[level - 1].Counts.GetValueOrDefault(cell);
+    }
 
-    /// <summary>Returns the smallest centered hex that encloses the full world at this level.</summary>
+    /// <summary>
+    /// Apply an occupancy delta when the simulation changes. Invoke this after
+    /// each empty-to-occupied (+1) or occupied-to-empty (-1) transition and
+    /// before drawing the next frame. A move is a -1 followed by a +1.
+    /// Complexity is O(number of zoom levels), independent of world area.
+    /// </summary>
+    public void ChangePopulation(HexCell baseCell, int delta)
+    {
+        if (delta is not (1 or -1))
+        {
+            throw new ArgumentOutOfRangeException(nameof(delta), "Expected +1 or -1.");
+        }
+
+        // A base-cell occupancy change affects exactly one coarse hex per
+        // level, so this is O(level count), not O(world area).
+        for (var i = 0; i < _levels.Count; i++)
+        {
+            var entry = _levels[i];
+            var parent = HexGridScale.ToLevel(baseCell, i + 1);
+            var old = entry.Counts.GetValueOrDefault(parent);
+            var updated = checked(old + delta);
+
+            if (updated < 0)
+            {
+                throw new InvalidOperationException("Cannot remove a penguin from an empty hex bucket.");
+            }
+
+            if (updated == 0)
+            {
+                entry.Counts.Remove(parent);
+            }
+            else
+            {
+                entry.Counts[parent] = updated;
+            }
+        }
+    }
+
     public HexRegion GetRegion(int level) => _levels[level - 1].Region;
 
-    /// <summary>Finds the finest parent level whose full-world hex fits the given radius.</summary>
+    /// <summary>
+    /// Return the finest complete-world level that fits in a hex of the
+    /// requested display radius. The main viewport can subsequently zoom
+    /// into any rectangle, including the off-world storage corners.
+    /// </summary>
     public (int Level, HexRegion Region) FitWorld(int maxRadius)
     {
         var index = _levels.FindIndex(level => level.Region.Radius <= maxRadius);
-
         if (index < 0)
         {
             index = _levels.Count - 1;
@@ -49,76 +116,30 @@ internal sealed class HexHeatmap
         return (index + 1, _levels[index].Region);
     }
 
-    /// <summary>Collects occupied base cells and groups every playable cell under its first parent.</summary>
-    private static (HashSet<HexCell> Occupied, Dictionary<HexCell, List<HexCell>> Groups) GroupBaseCells(
-        HexEnvironment environment, HexFootprint footprint)
+    /// <summary>
+    /// Finds the outermost transformed base-world cell on each row.
+    /// Every row contributes only two candidates, rather than O(radius)
+    /// interior cells. The result is used for the regular display hex.
+    /// </summary>
+    private static int GetCoarseRadius(int radius, int level)
     {
-        var occupied = new HashSet<HexCell>();
-        var groups = new Dictionary<HexCell, List<HexCell>>();
+        var maximum = 0;
 
-        foreach (var cell in footprint.Region.Cells())
+        for (var row = -radius; row <= radius; row++)
         {
-            var (column, row) = footprint.ToOffset(cell);
+            var minimumQ = Math.Max(-radius, -row - radius);
+            var maximumQ = Math.Min(radius, -row + radius);
 
-            if (environment[column, row] != HexEnvironment.EmptyCell)
-            {
-                occupied.Add(cell);
-            }
-
-            AddChildren(groups, cell.Parent(), [cell]);
+            var left = HexGridScale.ToLevel(new HexCell(minimumQ, row), level);
+            var right = HexGridScale.ToLevel(new HexCell(maximumQ, row), level);
+            maximum = Math.Max(maximum, Math.Max(
+                left.DistanceTo(default), right.DistanceTo(default)));
         }
 
-        return (occupied, groups);
+        return maximum;
     }
 
-    /// <summary>Calculates the counts, playable landing points, and world radius for one level.</summary>
-    private static Level BuildLevel(
-        int number, Dictionary<HexCell, List<HexCell>> groups, HashSet<HexCell> occupied)
-    {
-        var landingCells = new Dictionary<HexCell, HexCell>();
-        var counts = new Dictionary<HexCell, int>();
-
-        foreach (var (parent, children) in groups)
-        {
-            var center = parent.DescendToCenter(number);
-            var count = children.Count(occupied.Contains);
-
-            landingCells.Add(parent, children.MinBy(cell => cell.DistanceTo(center)));
-            counts.Add(parent, count);
-        }
-
-        var radius = groups.Keys.Max(cell => cell.DistanceTo(default));
-
-        return new Level(new HexRegion(default, radius), counts, landingCells);
-    }
-
-    /// <summary>Moves each group of base cells to the next aggregation level.</summary>
-    private static Dictionary<HexCell, List<HexCell>> GroupParents(Dictionary<HexCell, List<HexCell>> groups)
-    {
-        var parents = new Dictionary<HexCell, List<HexCell>>();
-
-        foreach (var (cell, children) in groups)
-        {
-            AddChildren(parents, cell.Parent(), children);
-        }
-
-        return parents;
-    }
-
-    /// <summary>Appends base cells to a parent while preserving their enumeration order.</summary>
-    private static void AddChildren(
-        Dictionary<HexCell, List<HexCell>> groups, HexCell parent, IEnumerable<HexCell> children)
-    {
-        if (!groups.TryGetValue(parent, out var group))
-        {
-            group = [];
-            groups.Add(parent, group);
-        }
-
-        group.AddRange(children);
-    }
-
-    /// <summary>Stores the rendering and navigation data reused for a parent level.</summary>
     private sealed record Level(
-        HexRegion Region, Dictionary<HexCell, int> Counts, Dictionary<HexCell, HexCell> LandingCells);
+        HexRegion Region,
+        Dictionary<HexCell, int> Counts);
 }

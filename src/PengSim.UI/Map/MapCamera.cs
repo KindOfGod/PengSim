@@ -1,64 +1,72 @@
 namespace PengSim.UI.Map;
 
-/// <summary>Tracks a base-cell position and an optional zoom level.</summary>
+/// <summary>
+/// Stores the camera in base-level axial coordinates. The display window is
+/// rectangular, but the world and the aggregation lattice remain hexagonal.
+/// </summary>
 internal sealed class MapCamera(HexFootprint footprint)
 {
-    /// <summary>Gets the camera position in base-level axial coordinates.</summary>
     public HexCell Center { get; private set; }
 
-    /// <summary>Gets the zoom level, or null when showing the full world.</summary>
+    /// <summary>Null displays the full overview; L0 displays base hexagons.</summary>
     public int? Level { get; private set; }
 
-    /// <summary>Moves one minimap cell and lands on a playable base cell.</summary>
-    public void Pan(int horizontal, int vertical, int overviewLevel, HexHeatmap heatmap)
+    /// <summary>
+    /// Moves in the currently displayed hex lattice, keeping horizontal and
+    /// vertical keys aligned with the screen's staggered row directions.
+    /// </summary>
+    public void Pan(int horizontal, int vertical, int level, int steps)
     {
-        var cell = Center.Ancestor(overviewLevel);
-        var row = cell.R + vertical;
-        var q = cell.Q + horizontal + (cell.R >> 1) - (row >> 1);
+        ArgumentOutOfRangeException.ThrowIfNegative(level);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(steps);
 
-        if (heatmap.FindBaseCell(new HexCell(q, row), overviewLevel) is { } center)
-        {
-            Center = center;
-        }
+        var current = HexGridScale.ToLevel(Center, level);
+        var nextRow = current.R + vertical * steps;
+        var nextColumn = current.Q + horizontal * steps + (current.R >> 1) - (nextRow >> 1);
+        var target = HexGridScale.ToBase(new HexCell(nextColumn, nextRow), level);
+        MoveToStorage(target);
     }
 
-    /// <summary>Moves one base cell without leaving the playable region.</summary>
+    /// <summary>
+    /// Moves one base cell. Empty corners of the storage square are valid:
+    /// only the hexagonal simulation footprint decides what is playable.
+    /// </summary>
     public void PanFine(int horizontal, int vertical)
     {
         var (column, row) = footprint.ToOffset(Center);
-        var target = footprint.ToAxial(column + horizontal, row + vertical);
-
-        if (footprint.Region.Contains(target))
-        {
-            Center = target;
-        }
+        var next = footprint.ToAxial(column + horizontal, row + vertical);
+        MoveToStorage(next);
     }
 
-    /// <summary>Selects the next finer level and stops at actual cells.</summary>
-    public void ZoomIn(int overviewLevel)
+    private void MoveToStorage(HexCell requested)
     {
-        Level = Math.Max(0, (Level ?? overviewLevel) - 1);
+        var (column, row) = footprint.ToOffset(requested);
+
+        column = Math.Clamp(column, 0, footprint.Size - 1);
+        row = Math.Clamp(row, 0, footprint.Size - 1);
+        Center = footprint.ToAxial(column, row);
     }
 
-    /// <summary>Selects the next coarser level or returns to the full overview.</summary>
+    public void ZoomIn(int overviewLevel) =>
+        Level = Math.Max(0, (Level ?? overviewLevel) - 1);
+
     public void ZoomOut(int overviewLevel)
     {
-        if (Level is not int level)
+        if (Level is not int current)
         {
             return;
         }
 
-        if (level + 1 >= overviewLevel)
+        if (current + 1 >= overviewLevel)
         {
             Reset();
         }
         else
         {
-            Level = level + 1;
+            Level = current + 1;
         }
     }
 
-    /// <summary>Centers the camera and returns to the full overview.</summary>
     public void Reset()
     {
         Center = default;

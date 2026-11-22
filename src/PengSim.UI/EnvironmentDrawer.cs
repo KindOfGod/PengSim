@@ -27,6 +27,7 @@ internal sealed class EnvironmentDrawer(IAnsiConsole console)
             return;
         }
 
+        console.Clear();
         console.Live(Render(environment, footprint, heatmap, camera, interactive: true))
             .AutoClear(false)
             .Start(context =>

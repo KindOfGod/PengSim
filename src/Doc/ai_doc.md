@@ -57,3 +57,7 @@ Add an entry here when making a change or deciding how the simulation is designe
 ## 2026-11-22 — Minimap pan steps
 
 - The viewport marker is a regular hex with a fixed radius at each zoom level. Pan keys move its center one minimap cell at a time and place the main camera at that parent cell's center in the base grid. Panning stops before the marker would cross the minimap boundary.
+
+## 2026-11-22 — Clear the interactive terminal on startup
+
+- The console clears once before starting the live map, so the first frame appears at the top. Redirected input or output still produces a single snapshot.

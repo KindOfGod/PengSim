@@ -9,7 +9,8 @@ internal static class HeatmapPalette
     public const string EmptyCellColor = "#767676";
 
     private const string PenguinColor = "#0087d7";
-    private const string ViewportBackground = "#303030";
+    /// <summary>Marks the selected minimap region with a high-contrast diamond.</summary>
+    public const string ViewportGlyph = $"[#101010 on {Accent}]◈[/]";
 
     public static readonly Style PanelBorder = Style.Parse(EmptyCellColor);
     public static readonly Style FrameBorder = Style.Parse("#949494");
@@ -32,15 +33,10 @@ internal static class HeatmapPalette
     /// <summary>Gets the minimum width of the swatch-only legend.</summary>
     public static int BandCount => Bands.Length;
 
-    /// <summary>Formats a cell using its density band and optional viewport highlight.</summary>
-    public static string DensityGlyph(int count, bool highlighted = false)
+    /// <summary>Formats a cell using its density band.</summary>
+    public static string DensityGlyph(int count)
     {
         var color = Bands.First(band => count <= band.Maximum).Color;
-        if (highlighted)
-        {
-            return $"[{color} on {ViewportBackground}]◈[/]";
-        }
-
         var glyph = count == 0 ? "⬡" : "⬢";
         return $"[{color}]{glyph}[/]";
     }

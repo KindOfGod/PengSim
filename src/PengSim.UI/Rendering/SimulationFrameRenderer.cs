@@ -62,7 +62,7 @@ internal static class SimulationFrameRenderer
 
         if (layout.ShowControls)
         {
-            content.Add(new Text(GetPositionText(camera, footprint, layout.ContentWidth)));
+            content.Add(new Markup(GetPositionText(camera, footprint, layout.ContentWidth)));
         }
 
         return new Panel(new Rows(content))
@@ -84,7 +84,7 @@ internal static class SimulationFrameRenderer
 
         if (camera.Level.HasValue && position.Length + 13 <= width)
         {
-            position += "  ◈ viewport";
+            position += $"  {HeatmapPalette.ViewportGlyph} viewport";
         }
 
         return position;

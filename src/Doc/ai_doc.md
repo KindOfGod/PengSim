@@ -122,3 +122,7 @@ Add an entry here when making a change or deciding how the simulation is designe
 
 - The console session handles input and redraws. Separate rendering code composes the frames, draws the map panels, fits them to the terminal, and defines the palette.
 - The hierarchy builder separates base-cell grouping, parent aggregation, and cached level data. XML summaries document the simulation and UI methods. The console output, navigation, demo data, and simulation behavior are preserved.
+
+## 2026-11-22 — High-contrast minimap selection
+
+- The viewport overlay uses dark diamonds on a teal background to distinguish the selected region from the density map. Its key uses the same styling.

@@ -105,7 +105,7 @@ internal static class MapPanels
         {
             if (marker is { } viewport && viewport.Contains(cell))
             {
-                return HeatmapPalette.DensityGlyph(counts.GetValueOrDefault(cell), highlighted: true);
+                return HeatmapPalette.ViewportGlyph;
             }
 
             return overview.Region.Contains(cell) ? HeatmapPalette.DensityGlyph(counts.GetValueOrDefault(cell)) : " ";

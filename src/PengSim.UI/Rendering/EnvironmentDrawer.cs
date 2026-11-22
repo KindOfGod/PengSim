@@ -48,21 +48,22 @@ internal sealed class EnvironmentDrawer
             // Building the sparse population index is an initialization cost,
             // not part of the per-keypress frame budget.
             var started = Stopwatch.GetTimestamp();
-            var heatmap = new HexHeatmap(environment, footprint);
+            var heatmap = new HexHeatmap(footprint);
+            heatmap.Rebuild(environment); // One density snapshot for this iteration.
             profile.Startup = Stopwatch.GetTimestamp() - started;
             var camera = new MapCamera(footprint);
 
             // Draw returns fully prepared rows; it never writes to the terminal.
-            string[] Draw(int width, int height, bool ansi = true) =>
+            string[] Draw(FrameLayout layout, bool ansi = true) =>
                 FrameRenderer.RenderRows(environment, footprint, heatmap, camera,
-                    simulationName, outputPath, iteration, width, height, ansi);
+                    simulationName, outputPath, iteration, layout, ansi);
 
             if (Console.IsInputRedirected || Console.IsOutputRedirected)
             {
                 // Non-interactive output is plain text (no cursor movement,
                 // no escape sequences) with a deterministic display size.
-                foreach (var row in Draw(
-                    RedirectedOutputWidth, RedirectedOutputHeight, ansi: false))
+                var layout = FrameLayout.Create(RedirectedOutputWidth, RedirectedOutputHeight);
+                foreach (var row in Draw(layout, ansi: false))
                 {
                     Console.WriteLine(row);
                 }
@@ -74,20 +75,26 @@ internal sealed class EnvironmentDrawer
             // the map renderer is unaware of terminal output operations.
             using var renderer = new TerminalPresenter();
             renderer.Start();
-            renderer.Present(Draw(Console.WindowWidth, Console.WindowHeight),
-                Console.WindowWidth, Console.WindowHeight);
+            var initialWidth = Console.WindowWidth;
+            var initialHeight = Console.WindowHeight;
+            renderer.Present(Draw(FrameLayout.Create(initialWidth, initialHeight)),
+                initialWidth, initialHeight);
 
             // Width/height are part of the key so resizing invalidates the
             // old screen even when the camera has not moved.
-            var last = (camera.Center, camera.Level, Console.WindowWidth, Console.WindowHeight);
+            var last = (camera.Center, camera.Level, initialWidth, initialHeight);
             while (true)
             {
+                var width = Console.WindowWidth;
+                var height = Console.WindowHeight;
+                var layout = FrameLayout.Create(width, height);
+
                 // Apply all queued keys before asking for a new complete frame.
                 // Only the final camera state of this batch becomes visible.
                 var count = 0;
                 while (count < MaxKeysPerFrame && Console.KeyAvailable)
                 {
-                    if (!Navigate(Console.ReadKey(intercept: true), camera, heatmap))
+                    if (!Navigate(Console.ReadKey(intercept: true), camera, heatmap, layout))
                     {
                         return;
                     }
@@ -95,13 +102,13 @@ internal sealed class EnvironmentDrawer
                     count++;
                 }
 
-                var state = (camera.Center, camera.Level, Console.WindowWidth, Console.WindowHeight);
+                var state = (camera.Center, camera.Level, width, height);
                 if (state != last)
                 {
                     // Measure rendering/composition separately from terminal
                     // output; previous profiling showed layout can dominate.
                     started = Stopwatch.GetTimestamp();
-                    var rows = Draw(state.Item3, state.Item4);
+                    var rows = Draw(layout);
                     var ready = Stopwatch.GetTimestamp();
                     renderer.Present(rows, state.Item3, state.Item4);
                     profile.Record(ready - started, Stopwatch.GetTimestamp() - ready);
@@ -124,7 +131,8 @@ internal sealed class EnvironmentDrawer
     /// Interpret one key. Normal pan moves several displayed hexes; Shift+pan
     /// moves one base hex. Zoom never alters the BL's playable world geometry.
     /// </summary>
-    private static bool Navigate(ConsoleKeyInfo input, MapCamera camera, HexHeatmap heatmap)
+    private static bool Navigate(
+        ConsoleKeyInfo input, MapCamera camera, HexHeatmap heatmap, FrameLayout layout)
     {
         if (input.Key == ConsoleKey.Q)
         {
@@ -153,17 +161,14 @@ internal sealed class EnvironmentDrawer
             }
             else
             {
-                camera.Pan(horizontal, vertical, level,
-                    FrameRenderer.PanStride(Console.WindowWidth, Console.WindowHeight));
+                camera.Pan(horizontal, vertical, level, layout.PanStride);
             }
         }
 
         if (input.KeyChar is '+' or '-')
         {
-            // The overview level must come from the exact same layout
-            // calculation used to render the minimap (including resize).
-            var overview = FrameRenderer.FitOverview(
-                heatmap, Console.WindowWidth, Console.WindowHeight).Level;
+            // Navigation uses the same layout and overview as the frame.
+            var overview = layout.FitOverview(heatmap).Level;
             if (input.KeyChar == '+')
             {
                 camera.ZoomIn(overview);

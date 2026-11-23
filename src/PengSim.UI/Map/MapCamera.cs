@@ -5,7 +5,7 @@ namespace PengSim.UI.Map;
 /// Stores the camera in base-level axial coordinates. The display window is
 /// rectangular, but the world and the aggregation lattice remain hexagonal.
 /// </summary>
-internal sealed class MapCamera(HexFootprint footprint)
+internal sealed class MapCamera(HexFootprint footprint, IHexGridScale scale) : IMapCamera
 {
     public HexCell Center { get; private set; }
 
@@ -21,10 +21,10 @@ internal sealed class MapCamera(HexFootprint footprint)
         ArgumentOutOfRangeException.ThrowIfNegative(level);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(steps);
 
-        var current = HexGridScale.ToLevel(Center, level);
+        var current = scale.ToLevel(Center, level);
         var nextRow = current.R + vertical * steps;
         var nextColumn = current.Q + horizontal * steps + (current.R >> 1) - (nextRow >> 1);
-        var target = HexGridScale.ToBase(new HexCell(nextColumn, nextRow), level);
+        var target = scale.ToBase(new HexCell(nextColumn, nextRow), level);
         MoveToStorage(target);
     }
 

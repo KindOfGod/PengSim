@@ -1,15 +1,10 @@
 namespace PengSim.UI.Rendering;
 
 /// <summary>Maps population counts to terminal glyphs and foreground colors.</summary>
-internal static class HeatmapPalette
+internal sealed class HeatmapPalette : IHeatmapPalette
 {
-    // Outside the valid 24-bit RGB range: tells ANSI output to restore the
-    // terminal's default foreground instead of selecting a specific color.
-    public const uint DefaultColor = uint.MaxValue;
-    public const uint Accent = 0x5fd7af;
-
-    public static readonly TerminalPixel OutsidePaint = new('·', 0x444444);
-    public static readonly TerminalPixel WorldEdgePaint = new('·', Accent);
+    public TerminalPixel OutsidePaint { get; } = new('·', 0x444444);
+    public TerminalPixel WorldEdgePaint { get; } = new('·', IHeatmapPalette.Accent);
 
     // Corresponds to 0, 1, 2, 3-4, 5-7, 8-15, 16-31, 32-63, 64-127,
     // and 128+ penguins respectively. Empty cells use a hollow hex glyph.
@@ -27,13 +22,13 @@ internal static class HeatmapPalette
         new('⬢', 0xff0000),
     ];
 
-    public static ReadOnlySpan<TerminalPixel> DensityBands => Bands;
+    public ReadOnlySpan<TerminalPixel> DensityBands => Bands;
 
     /// <summary>
     /// Constant-time band selection for the current zoom bucket.
     /// These paints are immutable and reused for every frame.
     /// </summary>
-    public static TerminalPixel GetDensityPaint(int population) => Bands[population switch
+    public TerminalPixel GetDensityPaint(int population) => Bands[population switch
     {
         <= 0 => 0,
         1 => 1,

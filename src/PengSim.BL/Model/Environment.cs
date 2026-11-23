@@ -1,10 +1,12 @@
+using PengSim.BL.Contracts;
+
 namespace PengSim.BL.Model;
 
 /// <summary>A pointy-topped hex grid with odd rows offset right by half a cell.</summary>
-public sealed class Environment
+public sealed class Environment : IMutableEnvironment
 {
     /// <summary>The value stored for cells without a penguin.</summary>
-    public const int EmptyCell = 0;
+    public const int EmptyCell = IEnvironment.EmptyCell;
 
     private readonly int[,] _cells;
 
@@ -17,9 +19,9 @@ public sealed class Environment
         _cells = new int[height, width];
     }
 
-    private Environment(Environment previous) => _cells = (int[,])previous._cells.Clone();
+    private Environment(int[,] cells) => _cells = cells;
 
-    internal Environment Copy() => new(this);
+    IMutableEnvironment IMutableEnvironment.Copy() => new Environment((int[,])_cells.Clone());
 
     /// <summary>Gets the number of columns.</summary>
     public int Width => _cells.GetLength(1);
@@ -28,9 +30,11 @@ public sealed class Environment
     public int Height => _cells.GetLength(0);
 
     /// <summary>Gets the occupancy ID at a column and row, or zero for an empty cell.</summary>
-    public int this[int column, int row]
+    public int this[int column, int row] => _cells[row, column];
+
+    int IMutableEnvironment.this[int column, int row]
     {
         get => _cells[row, column];
-        internal set => _cells[row, column] = value;
+        set => _cells[row, column] = value;
     }
 }

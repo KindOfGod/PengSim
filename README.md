@@ -36,6 +36,7 @@ The **main map** shows the area you are looking at. The **minimap** shows the wh
 
 - `src/PengSim.BL/` — simulation logic
 - `src/PengSim.UI/` — terminal visualization and demo
+- [AI design log](src/Doc/ai_doc.md) — change history and design decisions
 - [How rendering works](src/PengSim.UI/RENDERING.md) — short technical overview
 
-The engine creates an empty simulation. Each simulation owns a grid of penguin IDs and a dictionary of penguins keyed by ID. Zero means an empty cell. `Simulation.AddPenguin` assigns the next ID and updates both structures. The simulation keeps the initial grid and one grid per completed iteration in RAM. For now, each penguin takes one turn per iteration and moves into an empty neighboring hex closer to the center if one is available.
+The engine creates an empty simulation. Each simulation owns a grid of penguin IDs and a dictionary of penguins keyed by ID. Zero means an empty cell. `ISimulation.AddPenguin` assigns the next ID and updates both structures. The simulation keeps the initial grid and one grid per completed iteration in RAM. For now, each penguin takes one turn per iteration and moves into an empty neighboring hex closer to the center if one is available.

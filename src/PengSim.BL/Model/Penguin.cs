@@ -1,20 +1,22 @@
+using PengSim.BL.Contracts;
+
 namespace PengSim.BL.Model;
 
 /// <summary>Represents an individual penguin in a simulation.</summary>
-public sealed class Penguin
+public sealed class Penguin : IPenguin
 {
     private static readonly (int Q, int R)[] Directions =
         [(1, 0), (0, 1), (-1, 1), (-1, 0), (0, -1), (1, -1)];
 
-    private readonly int _id;
+    public int Id { get; }
     private int _column;
     private int _row;
 
     internal Penguin(int id, int column, int row) =>
-        (_id, _column, _row) = (id, column, row);
+        (Id, _column, _row) = (id, column, row);
 
     /// <summary>Moves into the nearest available inward neighbor, if one exists.</summary>
-    internal void Move(Environment grid)
+    void IPenguin.Move(IMutableEnvironment grid)
     {
         var center = HexCell.FromOffset(grid.Width / 2, grid.Height / 2);
         var current = HexCell.FromOffset(_column, _row);
@@ -28,7 +30,7 @@ public sealed class Penguin
             var row = neighbor.R;
             var column = neighbor.Q + (row >> 1);
             if (column < 0 || column >= grid.Width || row < 0 || row >= grid.Height
-                || grid[column, row] != Environment.EmptyCell || neighbor.DistanceTo(center) >= distance)
+                || grid[column, row] != IEnvironment.EmptyCell || neighbor.DistanceTo(center) >= distance)
             {
                 continue;
             }
@@ -45,8 +47,8 @@ public sealed class Penguin
 
         if (destination == (_column, _row)) return;
 
-        grid[_column, _row] = Environment.EmptyCell;
+        grid[_column, _row] = IEnvironment.EmptyCell;
         (_column, _row) = destination;
-        grid[_column, _row] = _id;
+        grid[_column, _row] = Id;
     }
 }

@@ -1,6 +1,6 @@
 using System.Diagnostics;
 using PengSim.UI.Map;
-using HexEnvironment = PengSim.BL.Model.Environment;
+using PengSim.BL.Contracts;
 
 namespace PengSim.UI.Rendering;
 
@@ -10,7 +10,11 @@ namespace PengSim.UI.Rendering;
 /// TerminalPresenter publishes its changed rows in one buffered write.
 /// This separation avoids partial frames and per-hexagon terminal I/O.
 /// </summary>
-internal sealed class EnvironmentDrawer
+internal sealed class EnvironmentDrawer(
+    IFrameRenderer frameRenderer,
+    Func<HexFootprint, IHexHeatmap> createHeatmap,
+    Func<HexFootprint, IMapCamera> createCamera,
+    Func<ITerminalPresenter> createPresenter) : IEnvironmentDrawer
 {
     // Without input, yield the CPU for 8 ms. A smaller value would spin more
     // often; a much larger one would make keyboard navigation feel sluggish.
@@ -24,18 +28,18 @@ internal sealed class EnvironmentDrawer
     private const int RedirectedOutputWidth = 101;
     private const int RedirectedOutputHeight = 35;
 
-    public void Show(IReadOnlyList<HexEnvironment> frames, HexFootprint footprint, string simulationName)
+    public void Show(IReadOnlyList<IEnvironment> frames, HexFootprint footprint, string simulationName)
     {
         var iteration = 0;
         var speed = 0;
         var nextFrame = TimeSpan.Zero;
         var clock = Stopwatch.StartNew();
-        var heatmap = new HexHeatmap(footprint);
+        var heatmap = createHeatmap(footprint);
         heatmap.Rebuild(frames[iteration]);
-        var camera = new MapCamera(footprint);
+        var camera = createCamera(footprint);
 
         string[] Draw(FrameLayout layout, bool ansi = true) =>
-            FrameRenderer.RenderRows(frames[iteration], footprint, heatmap, camera,
+            frameRenderer.RenderRows(frames[iteration], footprint, heatmap, camera,
                 simulationName, iteration, frames.Count - 1, speed, layout, ansi);
 
         if (Console.IsInputRedirected || Console.IsOutputRedirected)
@@ -45,7 +49,7 @@ internal sealed class EnvironmentDrawer
             return;
         }
 
-        using var renderer = new TerminalPresenter();
+        using var renderer = createPresenter();
         renderer.Start();
         var width = Console.WindowWidth;
         var height = Console.WindowHeight;
@@ -108,7 +112,7 @@ internal sealed class EnvironmentDrawer
     /// moves one base hex. Zoom never alters the BL's playable world geometry.
     /// </summary>
     private static bool Navigate(
-        ConsoleKeyInfo input, MapCamera camera, HexHeatmap heatmap, FrameLayout layout)
+        ConsoleKeyInfo input, IMapCamera camera, IHexHeatmap heatmap, FrameLayout layout)
     {
         if (input.Key == ConsoleKey.Q)
         {

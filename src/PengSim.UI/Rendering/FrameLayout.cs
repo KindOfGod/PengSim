@@ -70,7 +70,7 @@ internal readonly record struct FrameLayout(
     }
 
     /// <summary>Select the finest complete-world zoom level fitting both maps.</summary>
-    public (int Level, HexRegion Region) FitOverview(HexHeatmap heatmap)
+    public (int Level, HexRegion Region) FitOverview(IHexHeatmap heatmap)
     {
         var availableWidth = Math.Max(1, Math.Min(Map.Width, Minimap.Width) - 2);
         var availableHeight = Math.Max(1, Math.Min(Map.Height, Minimap.Height) - 2);

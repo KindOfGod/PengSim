@@ -7,12 +7,12 @@ namespace PengSim.BL;
 public sealed class SimulationEngine : ISimulationEngine
 {
     /// <inheritdoc />
-    public Simulation? CurrentSimulation { get; private set; }
+    public ISimulation? CurrentSimulation { get; private set; }
 
     /// <inheritdoc />
-    public Simulation CreateSimulation(int width, int height)
+    public ISimulation CreateSimulation(int width, int height)
     {
-        var simulation = new Simulation(width, height);
+        ISimulation simulation = new Simulation(width, height);
         CurrentSimulation = simulation;
 
         return simulation;

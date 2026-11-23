@@ -5,7 +5,8 @@ using PengSim.UI.Rendering;
 
 namespace PengSim.UI.Demo;
 
-internal sealed class SimulationDemo(ISimulationEngine engine, EnvironmentDrawer drawer)
+internal sealed class SimulationDemo(
+    ISimulationEngine engine, IEnvironmentDrawer drawer, Func<IDemoScreen> createScreen) : ISimulationDemo
 {
     private const int Steps = 1000;
     private const int Population = 5000;
@@ -13,10 +14,10 @@ internal sealed class SimulationDemo(ISimulationEngine engine, EnvironmentDrawer
     public void Run()
     {
         var interactive = !Console.IsInputRedirected && !Console.IsOutputRedirected;
-        using var screen = interactive ? new DemoScreen() : null;
-        const uint accent = HeatmapPalette.Accent;
-        const uint normal = HeatmapPalette.DefaultColor;
-        if (screen is not null && !DemoScreen.WaitFor('2', () => screen.Draw("Main menu",
+        using var screen = interactive ? createScreen() : null;
+        const uint accent = IHeatmapPalette.Accent;
+        const uint normal = IHeatmapPalette.DefaultColor;
+        if (screen is not null && !screen.WaitFor('2', () => screen.Draw("Main menu",
             ("Create simulation (coming soon)", 0x949494),
             ("[2] Run demo", accent),
             ("", normal),
@@ -49,7 +50,7 @@ internal sealed class SimulationDemo(ISimulationEngine engine, EnvironmentDrawer
 
         clock.Stop();
         total.Stop();
-        if (screen is not null && !DemoScreen.WaitFor('A',
+        if (screen is not null && !screen.WaitFor('A',
             () => DrawProgress(Steps, clock.Elapsed, completed: true))) return;
 
         drawer.Show(simulation.Frames, footprint, "Penguin demo");

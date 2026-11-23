@@ -3,13 +3,31 @@ using System.Text;
 namespace PengSim.UI.Rendering;
 
 /// <summary>One styled terminal character (foreground color only).</summary>
-internal readonly record struct TerminalPixel(char Glyph, uint Foreground);
+internal readonly record struct TerminalPixel(char Glyph, uint Foreground)
+{
+    public const string ResetStyle = "\u001b[0m";
+    private const int RedShift = 16;   // 0xRRGGBB: red occupies bits 16..23.
+    private const int GreenShift = 8;  // Green occupies bits 8..15.
+    private const uint ChannelMask = 0xFF; // A color channel is eight bits.
+
+    /// <summary>
+    /// SGR 38;2;R;G;Bm sets 24-bit RGB *foreground* color.
+    /// For example, 38;2;255;215;95m is the yellow minimap outline.
+    /// </summary>
+    public void AppendForegroundRgb(StringBuilder builder)
+    {
+        builder.Append("\u001b[38;2;")
+            .Append((Foreground >> RedShift) & ChannelMask).Append(';')
+            .Append((Foreground >> GreenShift) & ChannelMask).Append(';')
+            .Append(Foreground & ChannelMask).Append('m');
+    }
+}
 
 /// <summary>
 /// A flat row-major array of terminal cells. Painting is random access
 /// (O(1)); all rendering is completed before terminal I/O begins.
 /// </summary>
-internal sealed class TerminalBuffer
+internal sealed class TerminalBuffer : ITerminalBuffer
 {
     private readonly TerminalPixel[] _cells;
     private readonly int _width;
@@ -20,7 +38,7 @@ internal sealed class TerminalBuffer
         _width = width;
         _height = height;
         _cells = new TerminalPixel[width * height];
-        Array.Fill(_cells, new TerminalPixel(' ', HeatmapPalette.DefaultColor));
+        Array.Fill(_cells, new TerminalPixel(' ', IHeatmapPalette.DefaultColor));
     }
 
     /// <summary>Clip draws against terminal size instead of world size.</summary>
@@ -101,20 +119,20 @@ internal sealed class TerminalBuffer
         for (var row = 0; row < _height; row++)
         {
             var builder = new StringBuilder(_width * 3);
-            var currentColor = HeatmapPalette.DefaultColor;
+            var currentColor = IHeatmapPalette.DefaultColor;
             for (var col = 0; col < _width; col++)
             {
                 var cell = _cells[row * _width + col];
                 if (ansi && cell.Foreground != currentColor)
                 {
                     currentColor = cell.Foreground;
-                    if (currentColor == HeatmapPalette.DefaultColor)
+                    if (currentColor == IHeatmapPalette.DefaultColor)
                     {
-                        builder.Append(AnsiCodes.ResetStyle);
+                        builder.Append(TerminalPixel.ResetStyle);
                     }
                     else
                     {
-                        AnsiCodes.AppendForegroundRgb(builder, currentColor);
+                        cell.AppendForegroundRgb(builder);
                     }
                 }
 
@@ -122,7 +140,7 @@ internal sealed class TerminalBuffer
             }
 
             // Keep every row independently styled for changed-row output.
-            if (ansi) builder.Append(AnsiCodes.ResetStyle);
+            if (ansi) builder.Append(TerminalPixel.ResetStyle);
             result[row] = builder.ToString();
         }
 

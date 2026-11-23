@@ -49,7 +49,7 @@ The **main map** shows the area you are looking at. The **minimap** shows the wh
 
 ## Simulation storage and limits
 
-A run supports **65,000 penguins** and a board up to **65,000 columns × 65,000 rows**. Penguin IDs are consecutive `ushort` values starting at 1. Zero denotes an empty cell in occupancy queries. Both offset coordinates (`X` for column and `Y` for row) are also `ushort` and start at zero. On the largest board the last valid coordinate on either axis is 64,999.
+A run supports **65,000 penguins** and a board up to **65,000 columns × 65,000 rows**. Board width and height are both `ushort` and each must be between 1 and 65,000 inclusive. Penguin IDs are consecutive `ushort` values starting at 1. Zero denotes an empty cell in occupancy queries. Both offset coordinates (`X` for column and `Y` for row) are also `ushort` and start at zero. On the largest board the last valid coordinate on either axis is 64,999.
 
 Each iteration stores an array of `PenguinPosition` values in ID order. To read a penguin’s position, use `engine.Iterations[iteration].Positions[id - 1]`. Each entry contains two 16-bit coordinates (4 bytes). For 1,000 penguins and 1,000 steps, the coordinate payload of the 1,001 snapshots is 4,004,000 bytes, plus collection overhead. Board area does not affect this payload.
 

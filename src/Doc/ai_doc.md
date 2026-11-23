@@ -190,3 +190,7 @@ Contracts contains only interfaces. The Environment and Penguin implementations 
 The engine supports 1–65,000 columns, 1–65,000 rows and up to 65,000 penguins. IDs start at 1 and use ushort. X and Y are zero-based ushort offset coordinates. Bounds checks precede conversion from signed hex geometry so a move beyond the board cannot wrap to the opposite edge.
 
 Each completed iteration owns one PenguinPosition array indexed by ID minus one. Its payload is four bytes per penguin. Frame zero uses a growable array during placement and closes when stepping begins. Movement updates one occupied-position set in placement order so later penguins see earlier moves. The viewer rebuilds its base-cell and aggregate indexes from the selected frame. Neither the simulation nor its history allocates a full board grid.
+
+## Board dimensions use ushort
+
+The engine accepts ushort width and height, and each read-only iteration reports both dimensions as ushort. Board cell lookups take ushort column and row. The engine enforces 1–65,000 cells per axis. Camera and axial arithmetic use signed intermediates to represent cells on either side of the origin.

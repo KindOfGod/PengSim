@@ -10,7 +10,7 @@ internal sealed class SimulationDemo(
 {
     private const int IterationCount = 1000;
     private const int Population = 5000;
-    private static readonly HexFootprint Board = new(Radius: 150);
+    private static readonly HexFootprint Board = new(radius: 150);
     private static readonly TimeSpan ProgressInterval = TimeSpan.FromMilliseconds(100);
 
     public void Run()

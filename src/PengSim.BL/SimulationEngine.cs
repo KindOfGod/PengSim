@@ -20,7 +20,7 @@ public sealed class SimulationEngine : ISimulationEngine
         _simulation ?? throw new InvalidOperationException("Create a simulation before placing penguins or stepping.");
 
     /// <inheritdoc />
-    public void CreateSimulation(int width, int height)
+    public void CreateSimulation(ushort width, ushort height)
     {
         _simulation = new Simulation(width, height);
     }

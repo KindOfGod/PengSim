@@ -16,7 +16,7 @@ public interface ISimulationEngine
     IReadOnlyDictionary<ushort, IPenguin> Penguins { get; }
 
     /// <summary>Starts a new, empty simulation with the given positive dimensions and resets the iteration history.</summary>
-    void CreateSimulation(int width, int height);
+    void CreateSimulation(ushort width, ushort height);
 
     /// <summary>Places a penguin in an empty cell before the first step and returns its simulation-local ID.</summary>
     ushort AddPenguin(ushort column, ushort row);

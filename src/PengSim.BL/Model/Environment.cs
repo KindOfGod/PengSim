@@ -8,24 +8,22 @@ public sealed class Environment : IEnvironment
 {
     private readonly ReadOnlyCollection<PenguinPosition> _positions;
 
-    public int Width { get; }
-    public int Height { get; }
+    public ushort Width { get; }
+    public ushort Height { get; }
     public IReadOnlyList<PenguinPosition> Positions => _positions;
 
-    public ushort this[int column, int row]
+    public ushort this[ushort column, ushort row]
     {
         get
         {
-            ArgumentOutOfRangeException.ThrowIfNegative(column);
             ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(column, Width);
-            ArgumentOutOfRangeException.ThrowIfNegative(row);
             ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(row, Height);
-            var index = _positions.IndexOf(new PenguinPosition((ushort)column, (ushort)row));
+            var index = _positions.IndexOf(new PenguinPosition(column, row));
             return (ushort)(index + 1);
         }
     }
 
-    internal Environment(int width, int height, ReadOnlyCollection<PenguinPosition> positions)
+    internal Environment(ushort width, ushort height, ReadOnlyCollection<PenguinPosition> positions)
     {
         Width = width;
         Height = height;

@@ -1,14 +1,24 @@
+using PengSim.BL.Contracts;
 using HexCell = PengSim.BL.Model.HexCell;
 namespace PengSim.UI.Map;
 
 /// <summary>Maps the centered playable hex into the simulation storage grid.</summary>
-internal readonly record struct HexFootprint(int Radius)
+internal readonly record struct HexFootprint
 {
+    public ushort Radius { get; }
+
     /// <summary>Gets the width and height of the square storage grid.</summary>
-    public int Size => Radius * 2 + 1;
+    public ushort Size => checked((ushort)(Radius * 2 + 1));
 
     /// <summary>Gets the playable hex centered on the axial origin.</summary>
     public HexRegion Region => new(default, Radius);
+
+    public HexFootprint(ushort radius)
+    {
+        // A centered hex of radius r spans 2r + 1 cells.
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(radius, (ushort)((ISimulationEngine.MaxDimension - 1) / 2));
+        Radius = radius;
+    }
 
     /// <summary>Converts an offset-grid position to centered axial coordinates.</summary>
     public HexCell ToAxial(int column, int row) =>

@@ -14,12 +14,12 @@ internal sealed class Simulation : ISimulation
     public IReadOnlyList<IEnvironment> Frames { get; }
     public IReadOnlyDictionary<ushort, IPenguin> Penguins { get; }
 
-    public Simulation(int width, int height)
+    public Simulation(ushort width, ushort height)
     {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(width);
-        ArgumentOutOfRangeException.ThrowIfGreaterThan(width, (int)ISimulationEngine.MaxDimension);
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(height);
-        ArgumentOutOfRangeException.ThrowIfGreaterThan(height, (int)ISimulationEngine.MaxDimension);
+        ArgumentOutOfRangeException.ThrowIfZero(width);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(width, ISimulationEngine.MaxDimension);
+        ArgumentOutOfRangeException.ThrowIfZero(height);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(height, ISimulationEngine.MaxDimension);
 
         _frames.Add(new Environment(width, height, _initialPositions.AsReadOnly()));
         Frames = _frames.AsReadOnly();
@@ -38,8 +38,8 @@ internal sealed class Simulation : ISimulation
             throw new InvalidOperationException($"A simulation supports at most {ISimulationEngine.MaxPenguins} penguins.");
         }
 
-        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual((int)column, _frames[0].Width, nameof(column));
-        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual((int)row, _frames[0].Height, nameof(row));
+        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(column, _frames[0].Width);
+        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(row, _frames[0].Height);
         var position = new PenguinPosition(column, row);
         if (!_occupied.Add(position))
         {

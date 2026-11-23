@@ -9,14 +9,14 @@ public interface IEnvironment
     const ushort EmptyCell = 0;
 
     /// <summary>Gets the number of columns.</summary>
-    int Width { get; }
+    ushort Width { get; }
 
     /// <summary>Gets the number of rows.</summary>
-    int Height { get; }
+    ushort Height { get; }
 
     /// <summary>Gets read-only positions in ID order. The position for ID n is at index n - 1.</summary>
     IReadOnlyList<PenguinPosition> Positions { get; }
 
     /// <summary>Searches this frame for the penguin ID at the given cell, returning zero for an empty cell.</summary>
-    ushort this[int column, int row] { get; }
+    ushort this[ushort column, ushort row] { get; }
 }

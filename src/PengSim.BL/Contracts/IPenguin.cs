@@ -9,5 +9,5 @@ public interface IPenguin
     ushort Id { get; }
 
     /// <summary>Chooses the position after one turn using the current occupied cells.</summary>
-    internal PenguinPosition Move(PenguinPosition current, int width, int height, IReadOnlySet<PenguinPosition> occupied);
+    internal PenguinPosition Move(PenguinPosition current, ushort width, ushort height, IReadOnlySet<PenguinPosition> occupied);
 }

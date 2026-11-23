@@ -15,14 +15,14 @@ public sealed class Penguin : IPenguin
         Id = id;
     }
 
-    PenguinPosition IPenguin.Move(PenguinPosition current, int width, int height, IReadOnlySet<PenguinPosition> occupied)
+    PenguinPosition IPenguin.Move(PenguinPosition current, ushort width, ushort height, IReadOnlySet<PenguinPosition> occupied)
     {
         return MoveTowardCenterForDemo(current, width, height, occupied);
     }
 
     /// <summary>Temporary demo rule: move to an available inward neighbor.</summary>
     private static PenguinPosition MoveTowardCenterForDemo(
-        PenguinPosition position, int width, int height, IReadOnlySet<PenguinPosition> occupied)
+        PenguinPosition position, ushort width, ushort height, IReadOnlySet<PenguinPosition> occupied)
     {
         var center = HexCell.FromOffset(width / 2, height / 2);
         var current = HexCell.FromOffset(position.X, position.Y);

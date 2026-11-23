@@ -206,3 +206,7 @@ The maximum-size demo now runs for 100,000 steps. The initial placement and 100,
 ## Demo population for the 100,000-step run
 
 The demo places 10,000 penguins on the 65,000 × 65,000 board. Its 100,001 frames hold 4,000,040,000 bytes of position data. The engine still supports up to 65,000 penguins.
+
+## Smaller demo population
+
+The demo now places 1,000 penguins. At four bytes per position, the initial frame and 100,000 completed steps hold 400,004,000 bytes of coordinate data.

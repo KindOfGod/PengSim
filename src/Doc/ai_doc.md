@@ -202,3 +202,7 @@ The demo exercises both engine limits together: 65,000 penguins and a 65,000 × 
 ## Extended demo and temporary fast playback
 
 The maximum-size demo now runs for 100,000 steps. The initial placement and 100,000 completed snapshots contain about 26 GB of coordinates. During analysis, M temporarily selects 240 iterations per second. Playback follows elapsed time and displays the latest due iteration when drawing takes longer than a frame interval. Manual stepping still visits individual frames.
+
+## Demo population for the 100,000-step run
+
+The demo places 10,000 penguins on the 65,000 × 65,000 board. Its 100,001 frames hold 4,000,040,000 bytes of position data. The engine still supports up to 65,000 penguins.

@@ -9,6 +9,7 @@ namespace PengSim.UI.Demo;
 internal sealed class SimulationDemo(
     ISimulationEngine engine, IEnvironmentDrawer drawer, Func<IDemoScreen> createScreen) : ISimulationDemo
 {
+    private const int PenguinCount = 10_000;
     private const int IterationCount = 100_000;
     private static readonly HexFootprint Board = new(ISimulationEngine.MaxDimension);
     private static readonly TimeSpan ProgressInterval = TimeSpan.FromMilliseconds(100);
@@ -57,8 +58,8 @@ internal sealed class SimulationDemo(
 
     private void PlacePenguins()
     {
-        var placed = new HashSet<PenguinPosition>(ISimulationEngine.MaxPenguins);
-        while (placed.Count < ISimulationEngine.MaxPenguins)
+        var placed = new HashSet<PenguinPosition>(PenguinCount);
+        while (placed.Count < PenguinCount)
         {
             var x = (ushort)Random.Shared.Next(Board.Size);
             var y = (ushort)Random.Shared.Next(Board.Size);

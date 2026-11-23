@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using PengSim.BL.Contracts;
+using PengSim.BL.Model;
 using PengSim.UI.Map;
 using PengSim.UI.Rendering;
 
@@ -9,8 +10,7 @@ internal sealed class SimulationDemo(
     ISimulationEngine engine, IEnvironmentDrawer drawer, Func<IDemoScreen> createScreen) : ISimulationDemo
 {
     private const int IterationCount = 1000;
-    private const int Population = 5000;
-    private static readonly HexFootprint Board = new(radius: 150);
+    private static readonly HexFootprint Board = new(ISimulationEngine.MaxDimension);
     private static readonly TimeSpan ProgressInterval = TimeSpan.FromMilliseconds(100);
 
     public void Run()
@@ -35,7 +35,7 @@ internal sealed class SimulationDemo(
     {
         var totalTime = Stopwatch.StartNew();
         engine.CreateSimulation(Board.Size, Board.Size);
-        var cellCount = PlacePenguins();
+        PlacePenguins();
 
         var iterationTime = Stopwatch.StartNew();
         var nextUpdate = TimeSpan.Zero;
@@ -45,32 +45,33 @@ internal sealed class SimulationDemo(
             var elapsed = iterationTime.Elapsed;
             if (screen is not null && (elapsed >= nextUpdate || step == IterationCount))
             {
-                screen.ShowProgress(GetProgress(cellCount, totalTime.Elapsed, elapsed));
+                screen.ShowProgress(GetProgress(totalTime.Elapsed, elapsed));
                 nextUpdate = elapsed + ProgressInterval;
             }
         }
 
         iterationTime.Stop();
         totalTime.Stop();
-        return GetProgress(cellCount, totalTime.Elapsed, iterationTime.Elapsed);
+        return GetProgress(totalTime.Elapsed, iterationTime.Elapsed);
     }
 
-    private int PlacePenguins()
+    private void PlacePenguins()
     {
-        var cells = Board.Region.Cells().ToArray();
-        Random.Shared.Shuffle(cells);
-        foreach (var cell in cells.Take(Population))
+        var placed = new HashSet<PenguinPosition>(ISimulationEngine.MaxPenguins);
+        while (placed.Count < ISimulationEngine.MaxPenguins)
         {
-            var (column, row) = Board.ToOffset(cell);
-            engine.AddPenguin(checked((ushort)column), checked((ushort)row));
+            var x = (ushort)Random.Shared.Next(Board.Size);
+            var y = (ushort)Random.Shared.Next(Board.Size);
+            if (Board.Contains(x, y) && placed.Add(new PenguinPosition(x, y)))
+            {
+                engine.AddPenguin(x, y);
+            }
         }
-
-        return cells.Length;
     }
 
-    private DemoProgress GetProgress(int cellCount, TimeSpan totalTime, TimeSpan iterationTime)
+    private DemoProgress GetProgress(TimeSpan totalTime, TimeSpan iterationTime)
     {
         return new DemoProgress(engine.Iterations.Count - 1, IterationCount, totalTime,
-            iterationTime, engine.Penguins.Count, Board.Radius, cellCount);
+            iterationTime, engine.Penguins.Count, Board.Size);
     }
 }

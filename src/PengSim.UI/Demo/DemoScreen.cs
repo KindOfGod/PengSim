@@ -61,7 +61,7 @@ internal sealed class DemoScreen : IDemoScreen
             ($"Speed      {speed:N1} steps/s", Normal),
             ("", Normal),
             ($"Penguins   {progress.Penguins:N0}", Normal),
-            ($"Map        Radius {progress.Radius} · {progress.PlayableCells:N0} hexes", Normal),
+            ($"Map        {progress.BoardSize:N0} × {progress.BoardSize:N0}", Normal),
             ($"Frames     {progress.CompletedSteps + 1:N0} in memory", Normal),
             ("", Normal),
             (footer, Accent));

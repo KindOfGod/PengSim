@@ -194,3 +194,7 @@ Each completed iteration owns one PenguinPosition array indexed by ID minus one.
 ## Board dimensions use ushort
 
 The engine accepts ushort width and height, and each read-only iteration reports both dimensions as ushort. Board cell lookups take ushort column and row. The engine enforces 1–65,000 cells per axis. Camera and axial arithmetic use signed intermediates to represent cells on either side of the origin.
+
+## Maximum-size demo
+
+The demo exercises both engine limits together: 65,000 penguins and a 65,000 × 65,000 grid for 1,000 steps. The playable hex has radius 32,499 and is centered at offset (32,500, 32,500), the same center used by movement. Placement samples random board coordinates and retries cells outside the hex or already occupied, keeping setup memory proportional to population.

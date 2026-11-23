@@ -1,20 +1,39 @@
+using System.Collections.ObjectModel;
 using PengSim.BL.Contracts;
 using PengSim.BL.Model;
 
 namespace PengSim.BL;
 
-/// <summary>Creates and tracks the active simulation.</summary>
+/// <inheritdoc />
 public sealed class SimulationEngine : ISimulationEngine
 {
-    /// <inheritdoc />
-    public ISimulation? CurrentSimulation { get; private set; }
+    private ISimulation? _simulation;
 
     /// <inheritdoc />
-    public ISimulation CreateSimulation(int width, int height)
+    public IReadOnlyList<IEnvironment> Iterations => _simulation?.Frames ?? Array.Empty<IEnvironment>();
+
+    /// <inheritdoc />
+    public IReadOnlyDictionary<int, IPenguin> Penguins =>
+        _simulation?.Penguins ?? ReadOnlyDictionary<int, IPenguin>.Empty;
+
+    private ISimulation ActiveSimulation =>
+        _simulation ?? throw new InvalidOperationException("Create a simulation before placing penguins or stepping.");
+
+    /// <inheritdoc />
+    public void CreateSimulation(int width, int height)
     {
-        ISimulation simulation = new Simulation(width, height);
-        CurrentSimulation = simulation;
+        _simulation = new Simulation(width, height);
+    }
 
-        return simulation;
+    /// <inheritdoc />
+    public int AddPenguin(int column, int row)
+    {
+        return ActiveSimulation.AddPenguin(column, row);
+    }
+
+    /// <inheritdoc />
+    public void Step()
+    {
+        ActiveSimulation.Step();
     }
 }

@@ -4,21 +4,20 @@ using PengSim.BL.Contracts;
 namespace PengSim.BL.Model;
 
 /// <summary>Owns the environment and penguins for one simulation.</summary>
-public sealed class Simulation : ISimulation
+internal sealed class Simulation : ISimulation
 {
     private readonly Dictionary<int, IPenguin> _penguins = [];
 
     private readonly List<IEnvironment> _frames = [];
     private int[,] _cells;
 
-    /// <summary>Gets the environment that stores penguin positions.</summary>
-    public IEnvironment Environment => _frames[^1];
-
     /// <summary>Occupancy grids in chronological order, starting with initial placement.</summary>
     public IReadOnlyList<IEnvironment> Frames { get; }
 
     /// <summary>Gets a live read-only lookup of penguins by occupancy ID.</summary>
     public IReadOnlyDictionary<int, IPenguin> Penguins { get; }
+
+    private IEnvironment Environment => _frames[^1];
 
     /// <summary>Creates an empty simulation with the given dimensions.</summary>
     public Simulation(int width, int height)

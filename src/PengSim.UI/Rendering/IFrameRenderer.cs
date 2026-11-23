@@ -3,8 +3,10 @@ using PengSim.UI.Map;
 
 namespace PengSim.UI.Rendering;
 
+/// <summary>Composes map, legend, and playback information into terminal rows.</summary>
 internal interface IFrameRenderer
 {
+    /// <summary>Renders the selected iteration and camera view with optional ANSI styling.</summary>
     string[] RenderRows(
         IEnvironment environment,
         HexFootprint footprint,

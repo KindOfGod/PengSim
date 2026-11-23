@@ -21,17 +21,20 @@ internal sealed class SimulationDemo(
             ("Create simulation (coming soon)", 0x949494),
             ("[2] Run demo", accent),
             ("", normal),
-            ("[Q] Quit", normal)))) return;
+            ("[Q] Quit", normal))))
+        {
+            return;
+        }
 
         var total = Stopwatch.StartNew();
         var footprint = new HexFootprint(Radius: 150);
-        var simulation = engine.CreateSimulation(footprint.Size, footprint.Size);
+        engine.CreateSimulation(footprint.Size, footprint.Size);
         var cells = footprint.Region.Cells().ToArray();
         Random.Shared.Shuffle(cells);
         foreach (var cell in cells.Take(Population))
         {
             var (column, row) = footprint.ToOffset(cell);
-            simulation.AddPenguin(column, row);
+            engine.AddPenguin(column, row);
         }
 
         var clock = Stopwatch.StartNew();
@@ -39,7 +42,7 @@ internal sealed class SimulationDemo(
 
         for (var step = 1; step <= Steps; step++)
         {
-            simulation.Step();
+            engine.Step();
             var elapsed = clock.Elapsed;
             if (interactive && (elapsed >= nextUpdate || step == Steps))
             {
@@ -51,9 +54,12 @@ internal sealed class SimulationDemo(
         clock.Stop();
         total.Stop();
         if (screen is not null && !screen.WaitFor('A',
-            () => DrawProgress(Steps, clock.Elapsed, completed: true))) return;
+            () => DrawProgress(Steps, clock.Elapsed, completed: true)))
+        {
+            return;
+        }
 
-        drawer.Show(simulation.Frames, footprint, "Penguin demo");
+        drawer.Show(engine.Iterations, footprint, "Penguin demo");
 
         void DrawProgress(int step, TimeSpan elapsed, bool completed)
         {
@@ -66,9 +72,9 @@ internal sealed class SimulationDemo(
                 ($"Elapsed    {total.Elapsed.TotalSeconds:F3} s", normal),
                 ($"Speed      {step / elapsed.TotalSeconds:N1} steps/s", normal),
                 ("", normal),
-                ($"Penguins   {simulation.Penguins.Count:N0}", normal),
+                ($"Penguins   {engine.Penguins.Count:N0}", normal),
                 ($"Map        Radius {footprint.Radius} · {cells.Length:N0} hexes", normal),
-                ($"Frames     {simulation.Frames.Count:N0} in memory", normal),
+                ($"Frames     {engine.Iterations.Count:N0} in memory", normal),
                 ("", normal),
                 (completed ? "[A] Analyze    [Q] Quit" : "Calculating steps…", accent));
         }

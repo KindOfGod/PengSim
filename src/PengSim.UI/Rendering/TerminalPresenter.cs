@@ -72,10 +72,10 @@ internal sealed class TerminalPresenter : ITerminalPresenter
         _height = height;
     }
 
-    /// <summary>Restore terminal styles and the visible cursor on exit.</summary>
+    /// <summary>Clear the display and return the visible cursor to the top left on exit.</summary>
     public void Dispose()
     {
-        Console.Out.Write(TerminalPixel.ResetStyle + ShowCursor + "\n");
+        Console.Out.Write(TerminalPixel.ResetStyle + ClearScreen + HomeCursor + ShowCursor);
         Console.Out.Flush();
     }
 

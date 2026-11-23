@@ -164,3 +164,7 @@ ISimulationEngine is the public entry point for creation, placement, stepping, a
 ## Demo generation and screen responsibilities
 
 SimulationDemo coordinates the start menu, generation, and analysis. It places penguins and advances the engine, passing timing and population snapshots to IDemoScreen. DemoScreen owns menu shortcuts, progress formatting, and resize redraws. Redirected runs skip the menus and render the initial overview.
+
+## Clear the terminal on quit
+
+Quitting an interactive menu or playback clears the visible display and returns the cursor to the top left for the shell prompt. TerminalPresenter performs this cleanup when its session ends.

@@ -15,9 +15,6 @@ internal interface IHeatmapPalette
     /// <summary>Gets the glyph and color for the world boundary.</summary>
     TerminalPixel WorldEdgePaint { get; }
 
-    /// <summary>Gets the legend swatches in order of increasing population.</summary>
-    ReadOnlySpan<TerminalPixel> DensityBands { get; }
-
     /// <summary>Selects the glyph and color for a bucket with the specified population.</summary>
     TerminalPixel GetDensityPaint(int population);
 }

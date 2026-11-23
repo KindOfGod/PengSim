@@ -176,3 +176,7 @@ Backspace replaces Home for pausing playback and returning to iteration zero. Th
 ## Playback shortcut colors
 
 The playback footer uses the iteration border’s accent color for each key and the terminal’s default foreground for its action, making the shortcuts easier to scan.
+
+## Restore population values in the heatmap legend
+
+Each swatch shows the inclusive penguin count range for one displayed hex. Map colors and legend labels use the same thresholds. Narrow layouts reserve extra rows so the high-density ranges stay visible alongside the low-density ranges.

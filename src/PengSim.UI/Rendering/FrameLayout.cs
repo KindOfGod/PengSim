@@ -26,6 +26,7 @@ internal readonly record struct FrameLayout(
     FrameRect Minimap,
     FrameRect? Information)
 {
+    public const string LegendTitle = "Penguins per hex";
     private const int EdgeMargin = 1; // Avoid terminal auto-wrap at bottom/right.
     private const int SideBySideAt = 62;
     private const int MainWidthPercent = 52;
@@ -34,7 +35,9 @@ internal readonly record struct FrameLayout(
     private const int MinMainHeight = 5;
     private const int MinMinimapHeight = 3;
 
-    public bool Fits => Width >= 24 && Height >= 14;
+    public bool Fits => Width >= 24 && Height >= 14 && Main.Height >= 3 && Minimap.Height >= 3;
+    public bool InlineLegend => FitsInlineLegend(Map.Width);
+    public int LegendColumns => GetLegendColumns(Map.Width);
     public int LegendRow => Map.Y + Map.Height;
 
     /// <summary>Normal pan moves about one sixth of the visible display.</summary>
@@ -49,6 +52,13 @@ internal readonly record struct FrameLayout(
         // Reserve space for the outer border, two metadata lines, and footer.
         var iteration = new FrameRect(2, 3, width - 4, height - 5);
         var map = new FrameRect(3, 4, iteration.Width - 2, iteration.Height - 4);
+
+        if (!FitsInlineLegend(map.Width))
+        {
+            var columns = GetLegendColumns(map.Width);
+            var bandRows = (DensityBand.All.Length + columns - 1) / columns;
+            map = map with { Height = map.Height - bandRows };
+        }
 
         if (width >= SideBySideAt)
         {
@@ -65,8 +75,8 @@ internal readonly record struct FrameLayout(
         }
 
         // Narrow terminals stack the main map and the minimap.
-        var mainHeight = Math.Max(MinMainHeight, map.Height * 2 / 3);
-        var minimapHeight = Math.Max(MinMinimapHeight, map.Height - mainHeight);
+        var mainHeight = Math.Clamp(map.Height * 2 / 3, MinMainHeight, Math.Max(MinMainHeight, map.Height - MinMinimapHeight));
+        var minimapHeight = map.Height - mainHeight;
         return new FrameLayout(width, height, iteration, map,
             new FrameRect(map.X, map.Y, map.Width, mainHeight),
             new FrameRect(map.X, map.Y + mainHeight, map.Width, minimapHeight),
@@ -84,5 +94,15 @@ internal readonly record struct FrameLayout(
         var radius = Math.Max(0,
             Math.Min((availableWidth - 3) / 4, (availableHeight - 3) / 2));
         return heatmap.FitWorld(radius);
+    }
+
+    private static bool FitsInlineLegend(int width)
+    {
+        return width >= LegendTitle.Length + 2 + DensityBand.All.Length * DensityBand.LegendColumnWidth;
+    }
+
+    private static int GetLegendColumns(int width)
+    {
+        return Math.Max(1, width / DensityBand.LegendColumnWidth);
     }
 }

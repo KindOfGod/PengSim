@@ -17,9 +17,6 @@ internal sealed class FrameRenderer(
     private const uint SelectionColor = 0xffd75f;
     private const uint CenterColor = 0xfff0a0;
 
-    private const int LegendTitleWidth = 18;
-    private const int LegendSwatchSpacing = 2;
-
     private static readonly (string Key, string Action)[] Shortcuts =
     [
         ("WASD", "pan"),
@@ -47,7 +44,7 @@ internal sealed class FrameRenderer(
     {
         if (!layout.Fits)
         {
-            return ["Terminal too small for map view. Resize to at least 25 x 15."];
+            return ["Terminal too small for map view. Increase the terminal width or height."];
         }
 
         var screen = createBuffer(layout.Width, layout.Height);
@@ -78,30 +75,43 @@ internal sealed class FrameRenderer(
             DrawInformation(screen, footprint, camera, level, overview.Level, info);
         }
 
-        var legendY = layout.LegendRow;
-        screen.Text(layout.Map.X, legendY, "Penguins per hex",
-            IHeatmapPalette.DefaultColor, LegendTitleWidth);
-
-        for (var i = 0; i < palette.DensityBands.Length; i++)
-        {
-            var x = layout.Map.X + LegendTitleWidth + i * LegendSwatchSpacing;
-            if (x >= layout.Map.X + layout.Map.Width)
-            {
-                break;
-            }
-
-            screen.Put(x, legendY, palette.DensityBands[i]);
-        }
+        DrawLegend(screen, layout);
 
         var (column, row) = footprint.ToOffset(camera.Center);
         var position = camera.Level.HasValue
             ? $"Zoom L{level}   ({column}, {row})"
             : $"Overview L{overview.Level}   ({column}, {row})";
-        screen.Text(layout.Map.X, legendY + 1,
+        screen.Text(layout.Map.X, iterationPanel.Y + iterationPanel.Height - 2,
             position, IHeatmapPalette.DefaultColor, layout.Map.Width);
         DrawShortcuts(screen, layout);
 
         return screen.ToAnsiRows(ansi);
+    }
+
+    private static void DrawLegend(ITerminalBuffer screen, FrameLayout layout)
+    {
+        var left = layout.Map.X;
+        var row = layout.LegendRow;
+        screen.Text(left, row, FrameLayout.LegendTitle, IHeatmapPalette.DefaultColor, layout.Map.Width);
+        if (layout.InlineLegend)
+        {
+            left += FrameLayout.LegendTitle.Length + 2;
+        }
+        else
+        {
+            row++;
+        }
+
+        var bands = DensityBand.All;
+        var columns = layout.LegendColumns;
+        for (var i = 0; i < bands.Length; i++)
+        {
+            var x = left + i % columns * DensityBand.LegendColumnWidth;
+            var y = row + i / columns;
+            var band = bands[i];
+            screen.Put(x, y, band.Paint);
+            screen.Text(x + 2, y, band.Label, IHeatmapPalette.DefaultColor, band.Label.Length);
+        }
     }
 
     private static void DrawShortcuts(ITerminalBuffer screen, FrameLayout layout)

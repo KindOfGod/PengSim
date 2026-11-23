@@ -9,7 +9,7 @@ namespace PengSim.UI.Demo;
 internal sealed class SimulationDemo(
     ISimulationEngine engine, IEnvironmentDrawer drawer, Func<IDemoScreen> createScreen) : ISimulationDemo
 {
-    private const int IterationCount = 1000;
+    private const int IterationCount = 100_000;
     private static readonly HexFootprint Board = new(ISimulationEngine.MaxDimension);
     private static readonly TimeSpan ProgressInterval = TimeSpan.FromMilliseconds(100);
 

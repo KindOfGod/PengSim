@@ -16,9 +16,9 @@ internal sealed class EnvironmentDrawer(
     Func<HexFootprint, IMapCamera> createCamera,
     Func<ITerminalPresenter> createPresenter) : IEnvironmentDrawer
 {
-    // Without input, yield the CPU for 8 ms. A smaller value would spin more
-    // often; a much larger one would make keyboard navigation feel sluggish.
+    // Bound the wait for keyboard input when paused or playing slowly.
     private const int InputPollMilliseconds = 8;
+    private const int TemporaryFastPlaybackFps = 240;
 
     // Coalesce key-repeat bursts into one camera update and one redraw.
     // Bound the batch so holding a key cannot indefinitely starve rendering.
@@ -95,10 +95,13 @@ internal sealed class EnvironmentDrawer(
                     iteration = Math.Clamp(iteration + (input.Key == ConsoleKey.LeftArrow ? -1 : 1),
                         0, frames.Count - 1);
                 }
-                else if (char.IsAsciiDigit(input.KeyChar))
+                else if (input.Key == ConsoleKey.M || char.IsAsciiDigit(input.KeyChar))
                 {
-                    speed = input.KeyChar - '0';
-                    if (speed > 0) nextFrame = clock.Elapsed + TimeSpan.FromSeconds(1d / speed);
+                    speed = input.Key == ConsoleKey.M ? TemporaryFastPlaybackFps : input.KeyChar - '0';
+                    if (speed > 0)
+                    {
+                        nextFrame = clock.Elapsed + TimeSpan.FromSeconds(1d / speed);
+                    }
                 }
                 else if (!Navigate(input, camera, heatmap, layout))
                 {
@@ -108,12 +111,19 @@ internal sealed class EnvironmentDrawer(
                 count++;
             }
 
-            if (speed > 0 && clock.Elapsed >= nextFrame)
+            var now = clock.Elapsed;
+            if (speed > 0 && now >= nextFrame)
             {
-                iteration = Math.Min(iteration + 1, frames.Count - 1);
-                nextFrame += TimeSpan.FromSeconds(1d / speed);
+                var interval = TimeSpan.FromSeconds(1d / speed);
+                var due = 1 + (now - nextFrame).Ticks / interval.Ticks;
+                var advance = (int)Math.Min(due, frames.Count - 1 - iteration);
+                iteration += advance;
+                nextFrame += interval * advance;
             }
-            if (iteration == frames.Count - 1) speed = 0;
+            if (iteration == frames.Count - 1)
+            {
+                speed = 0;
+            }
 
             var state = (camera.Center, camera.Level, width, height, iteration, speed);
             if (state != last)
@@ -123,7 +133,12 @@ internal sealed class EnvironmentDrawer(
                 last = state;
             }
 
-            if (count == 0) Thread.Sleep(InputPollMilliseconds);
+            if (count == 0)
+            {
+                var wait = speed == 0 ? InputPollMilliseconds
+                    : Math.Clamp((nextFrame - clock.Elapsed).TotalMilliseconds, 0, InputPollMilliseconds);
+                Thread.Sleep((int)Math.Ceiling(wait));
+            }
         }
     }
 

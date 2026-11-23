@@ -198,3 +198,7 @@ The engine accepts ushort width and height, and each read-only iteration reports
 ## Maximum-size demo
 
 The demo exercises both engine limits together: 65,000 penguins and a 65,000 × 65,000 grid for 1,000 steps. The playable hex has radius 32,499 and is centered at offset (32,500, 32,500), the same center used by movement. Placement samples random board coordinates and retries cells outside the hex or already occupied, keeping setup memory proportional to population.
+
+## Extended demo and temporary fast playback
+
+The maximum-size demo now runs for 100,000 steps. The initial placement and 100,000 completed snapshots contain about 26 GB of coordinates. During analysis, M temporarily selects 240 iterations per second. Playback follows elapsed time and displays the latest due iteration when drawing takes longer than a frame interval. Manual stepping still visits individual frames.

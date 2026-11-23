@@ -1,18 +1,34 @@
+using System.Collections.ObjectModel;
 using PengSim.BL.Contracts;
 
 namespace PengSim.BL.Model;
 
-/// <summary>A read-only view of occupancy in one simulation frame.</summary>
+/// <summary>Read-only positions for one simulation iteration.</summary>
 public sealed class Environment : IEnvironment
 {
-    private readonly int[,] _cells;
+    private readonly ReadOnlyCollection<PenguinPosition> _positions;
 
-    public int Width => _cells.GetLength(1);
-    public int Height => _cells.GetLength(0);
-    public int this[int column, int row] => _cells[row, column];
+    public int Width { get; }
+    public int Height { get; }
+    public IReadOnlyList<PenguinPosition> Positions => _positions;
 
-    internal Environment(int[,] cells)
+    public ushort this[int column, int row]
     {
-        _cells = cells;
+        get
+        {
+            ArgumentOutOfRangeException.ThrowIfNegative(column);
+            ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(column, Width);
+            ArgumentOutOfRangeException.ThrowIfNegative(row);
+            ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(row, Height);
+            var index = _positions.IndexOf(new PenguinPosition((ushort)column, (ushort)row));
+            return (ushort)(index + 1);
+        }
+    }
+
+    internal Environment(int width, int height, ReadOnlyCollection<PenguinPosition> positions)
+    {
+        Width = width;
+        Height = height;
+        _positions = positions;
     }
 }

@@ -47,4 +47,10 @@ The **main map** shows the area you are looking at. The **minimap** shows the wh
 - [AI design log](src/Doc/ai_doc.md) — change history and design decisions
 - [How rendering works](src/PengSim.UI/RENDERING.md) — short technical overview
 
-The engine creates an empty simulation. Each simulation owns a grid of penguin IDs and a dictionary of penguins keyed by ID. Zero means an empty cell. `ISimulationEngine.AddPenguin` assigns the next ID and updates both structures. Call `Step()` on the engine to advance the run. Read `engine.Iterations[0]` for initial placement or `engine.Iterations[n]` for the grid after step n. Both the history and its grids are read-only to callers. For now, each penguin takes one turn per iteration and moves into an empty neighboring hex closer to the center if one is available.
+## Simulation storage and limits
+
+A run supports **65,000 penguins** and a board up to **65,000 columns × 65,000 rows**. Penguin IDs are consecutive `ushort` values starting at 1. Zero denotes an empty cell in occupancy queries. Both offset coordinates (`X` for column and `Y` for row) are also `ushort` and start at zero. On the largest board the last valid coordinate on either axis is 64,999.
+
+Each iteration stores an array of `PenguinPosition` values in ID order. To read a penguin’s position, use `engine.Iterations[iteration].Positions[id - 1]`. Each entry contains two 16-bit coordinates (4 bytes). For 1,000 penguins and 1,000 steps, the coordinate payload of the 1,001 snapshots is 4,004,000 bytes, plus collection overhead. Board area does not affect this payload.
+
+Frame zero reflects placement through `AddPenguin` until the first `Step()`. Each step writes a fresh position array, so earlier frames remain available for read-only playback. A single occupied-position set serves collision checks while the demo moves penguins toward the center in ID order.

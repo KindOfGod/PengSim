@@ -13,8 +13,8 @@ public sealed class SimulationEngine : ISimulationEngine
     public IReadOnlyList<IEnvironment> Iterations => _simulation?.Frames ?? Array.Empty<IEnvironment>();
 
     /// <inheritdoc />
-    public IReadOnlyDictionary<int, IPenguin> Penguins =>
-        _simulation?.Penguins ?? ReadOnlyDictionary<int, IPenguin>.Empty;
+    public IReadOnlyDictionary<ushort, IPenguin> Penguins =>
+        _simulation?.Penguins ?? ReadOnlyDictionary<ushort, IPenguin>.Empty;
 
     private ISimulation ActiveSimulation =>
         _simulation ?? throw new InvalidOperationException("Create a simulation before placing penguins or stepping.");
@@ -26,7 +26,7 @@ public sealed class SimulationEngine : ISimulationEngine
     }
 
     /// <inheritdoc />
-    public int AddPenguin(int column, int row)
+    public ushort AddPenguin(ushort column, ushort row)
     {
         return ActiveSimulation.AddPenguin(column, row);
     }

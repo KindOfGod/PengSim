@@ -62,7 +62,7 @@ internal sealed class SimulationDemo(
         foreach (var cell in cells.Take(Population))
         {
             var (column, row) = Board.ToOffset(cell);
-            engine.AddPenguin(column, row);
+            engine.AddPenguin(checked((ushort)column), checked((ushort)row));
         }
 
         return cells.Length;

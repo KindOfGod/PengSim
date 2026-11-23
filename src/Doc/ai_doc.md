@@ -184,3 +184,9 @@ Each swatch shows the inclusive penguin count range for one displayed hex. Map c
 ## Interface-only contracts
 
 Contracts contains only interfaces. The Environment and Penguin implementations live in Model alongside Simulation, which constructs them. Consumers continue to access frames and penguins through IEnvironment and IPenguin.
+
+## Position arrays and 16-bit simulation limits
+
+The engine supports 1–65,000 columns, 1–65,000 rows and up to 65,000 penguins. IDs start at 1 and use ushort. X and Y are zero-based ushort offset coordinates. Bounds checks precede conversion from signed hex geometry so a move beyond the board cannot wrap to the opposite edge.
+
+Each completed iteration owns one PenguinPosition array indexed by ID minus one. Its payload is four bytes per penguin. Frame zero uses a growable array during placement and closes when stepping begins. Movement updates one occupied-position set in placement order so later penguins see earlier moves. The viewer rebuilds its base-cell and aggregate indexes from the selected frame. Neither the simulation nor its history allocates a full board grid.

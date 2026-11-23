@@ -48,7 +48,7 @@ internal sealed class EnvironmentDrawer(
         void Draw(FrameLayout layout, ITerminalPresenter? presenter, int width, int height)
         {
             var preparing = Timestamp();
-            var rows = frameRenderer.RenderRows(frames[iteration], footprint, heatmap, camera,
+            var rows = frameRenderer.RenderRows(footprint, heatmap, camera,
                 simulationName, iteration, frames.Count - 1, speed, layout, ansi: presenter is not null);
             var ready = Timestamp();
             if (presenter is null)

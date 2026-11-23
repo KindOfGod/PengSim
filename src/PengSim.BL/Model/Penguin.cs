@@ -8,30 +8,26 @@ public sealed class Penguin : IPenguin
     private static readonly (int Q, int R)[] Directions =
         [(1, 0), (0, 1), (-1, 1), (-1, 0), (0, -1), (1, -1)];
 
-    private int _column;
-    private int _row;
+    public ushort Id { get; }
 
-    public int Id { get; }
-
-    internal Penguin(int id, int column, int row)
+    internal Penguin(ushort id)
     {
-        (Id, _column, _row) = (id, column, row);
+        Id = id;
     }
 
-    void IPenguin.Move(int[,] cells)
+    PenguinPosition IPenguin.Move(PenguinPosition current, int width, int height, IReadOnlySet<PenguinPosition> occupied)
     {
-        MoveTowardCenterForDemo(cells);
+        return MoveTowardCenterForDemo(current, width, height, occupied);
     }
 
     /// <summary>Temporary demo rule: move to an available inward neighbor.</summary>
-    private void MoveTowardCenterForDemo(int[,] cells)
+    private static PenguinPosition MoveTowardCenterForDemo(
+        PenguinPosition position, int width, int height, IReadOnlySet<PenguinPosition> occupied)
     {
-        var height = cells.GetLength(0);
-        var width = cells.GetLength(1);
         var center = HexCell.FromOffset(width / 2, height / 2);
-        var current = HexCell.FromOffset(_column, _row);
+        var current = HexCell.FromOffset(position.X, position.Y);
         var distance = current.DistanceTo(center);
-        var destination = (_column, _row);
+        var destination = position;
         var bestScore = long.MaxValue;
 
         foreach (var (dq, dr) in Directions)
@@ -40,7 +36,13 @@ public sealed class Penguin : IPenguin
             var row = neighbor.R;
             var column = neighbor.Q + (row >> 1);
             if (column < 0 || column >= width || row < 0 || row >= height
-                || cells[row, column] != IEnvironment.EmptyCell || neighbor.DistanceTo(center) >= distance)
+                || neighbor.DistanceTo(center) >= distance)
+            {
+                continue;
+            }
+
+            var candidate = new PenguinPosition((ushort)column, (ushort)row);
+            if (occupied.Contains(candidate))
             {
                 continue;
             }
@@ -52,17 +54,10 @@ public sealed class Penguin : IPenguin
             if (score < bestScore)
             {
                 bestScore = score;
-                destination = (column, row);
+                destination = candidate;
             }
         }
 
-        if (destination == (_column, _row))
-        {
-            return;
-        }
-
-        cells[_row, _column] = IEnvironment.EmptyCell;
-        (_column, _row) = destination;
-        cells[_row, _column] = Id;
+        return destination;
     }
 }

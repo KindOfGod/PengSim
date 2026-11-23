@@ -14,6 +14,7 @@ internal sealed class HexHeatmap : IHexHeatmap
 
     private readonly IHexGridScale _scale;
     private readonly HexFootprint _footprint;
+    private readonly HashSet<HexCell> _baseCells = [];
     private readonly List<Level> _levels = [];
 
     public HexHeatmap(HexFootprint footprint, IHexGridScale scale)
@@ -52,15 +53,16 @@ internal sealed class HexHeatmap : IHexHeatmap
             level.Counts.Clear();
         }
 
-        // Scan the world once, counting only occupied base-level hex cells.
-        foreach (var cell in _footprint.Region.Cells())
+        _baseCells.Clear();
+        foreach (var position in environment.Positions)
         {
-            var (column, row) = _footprint.ToOffset(cell);
-            if (environment[column, row] == IEnvironment.EmptyCell)
+            var cell = _footprint.ToAxial(position.X, position.Y);
+            if (!_footprint.Region.Contains(cell))
             {
                 continue;
             }
 
+            _baseCells.Add(cell);
             for (var zoom = 1; zoom <= _levels.Count; zoom++)
             {
                 var bucket = _scale.ToLevel(cell, zoom);
@@ -71,8 +73,15 @@ internal sealed class HexHeatmap : IHexHeatmap
     }
 
     /// <summary>Absent entries represent empty buckets.</summary>
-    public int GetPopulation(int zoom, HexCell cell) =>
-        _levels[zoom - 1].Counts.GetValueOrDefault(cell);
+    public int GetPopulation(int zoom, HexCell cell)
+    {
+        if (zoom == 0)
+        {
+            return _baseCells.Contains(cell) ? 1 : 0;
+        }
+
+        return _levels[zoom - 1].Counts.GetValueOrDefault(cell);
+    }
 
     public HexRegion GetRegion(int zoom) => _levels[zoom - 1].Region;
 

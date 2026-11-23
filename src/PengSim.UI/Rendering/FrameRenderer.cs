@@ -1,6 +1,5 @@
 using HexCell = PengSim.BL.Model.HexCell;
 using PengSim.UI.Map;
-using PengSim.BL.Contracts;
 
 namespace PengSim.UI.Rendering;
 
@@ -31,7 +30,6 @@ internal sealed class FrameRenderer(
     ];
 
     public string[] RenderRows(
-        IEnvironment environment,
         HexFootprint footprint,
         IHexHeatmap heatmap,
         IMapCamera camera,
@@ -65,9 +63,9 @@ internal sealed class FrameRenderer(
             ? scale.ToLevel(camera.Center, level)
             : overview.Region.Center;
 
-        DrawMain(screen, environment, footprint, heatmap, level,
+        DrawMain(screen, footprint, heatmap, level,
             mainCenter, layout.Main);
-        DrawMinimap(screen, environment, footprint, heatmap, camera,
+        DrawMinimap(screen, footprint, heatmap, camera,
             overview.Level, level, mainCenter, layout.Main, layout.Minimap);
 
         if (layout.Information is { } info)
@@ -129,19 +127,19 @@ internal sealed class FrameRenderer(
     }
 
     private void DrawMain(
-        ITerminalBuffer screen, IEnvironment environment, HexFootprint footprint,
+        ITerminalBuffer screen, HexFootprint footprint,
         IHexHeatmap heatmap, int level, HexCell center, FrameRect panel)
     {
         screen.Box(panel.X, panel.Y, panel.Width, panel.Height,
             level == 0 ? "Hex grid · L0" : $"Heatmap · L{level}", PanelColor);
 
-        DrawCells(screen, environment, footprint, heatmap, level,
+        DrawCells(screen, footprint, heatmap, level,
             panel.CenteredContent(center), panel.X + 1, panel.Y + 1,
             null, null);
     }
 
     private void DrawMinimap(
-        ITerminalBuffer screen, IEnvironment environment, HexFootprint footprint,
+        ITerminalBuffer screen, HexFootprint footprint,
         IHexHeatmap heatmap, IMapCamera camera,
         int overviewLevel, int detailLevel, HexCell mainCenter,
         FrameRect main, FrameRect minimap)
@@ -159,7 +157,7 @@ internal sealed class FrameRenderer(
             ? scale.ToLevel(camera.Center, overviewLevel)
             : null;
 
-        DrawCells(screen, environment, footprint, heatmap, overviewLevel,
+        DrawCells(screen, footprint, heatmap, overviewLevel,
             minimap.CenteredContent(default), minimap.X + 1, minimap.Y + 1,
             selection, selectedCenter);
     }
@@ -194,7 +192,7 @@ internal sealed class FrameRenderer(
     /// blank so the hexagonal rows appear staggered in a monospace terminal.
     /// </summary>
     private void DrawCells(
-        ITerminalBuffer screen, IEnvironment environment, HexFootprint footprint,
+        ITerminalBuffer screen, HexFootprint footprint,
         IHexHeatmap heatmap, int level, MapScreenBounds bounds,
         int screenX, int screenY,
         MinimapViewport? selection, HexCell? cameraCenter)
@@ -212,7 +210,7 @@ internal sealed class FrameRenderer(
             {
                 var mapX = bounds.Left + x;
                 var cell = new HexCell((mapX - row) / 2, row);
-                var paint = GetCellPaint(environment, footprint, heatmap, world, level, cell);
+                var paint = GetCellPaint(heatmap, world, level, cell);
 
                 if (cameraCenter is { } center && cell == center)
                 {
@@ -229,20 +227,18 @@ internal sealed class FrameRenderer(
     }
 
     /// <summary>
-    /// L0 reads the current simulation directly. Coarser hex cells use the
+    /// L0 reads the selected frame’s occupied cells. Coarser hex cells use the
     /// sparse aggregate index. Only cells at distance R+1 from the *world*
     /// center get the teal border; the camera perimeter never gets it.
     /// </summary>
     private TerminalPixel GetCellPaint(
-        IEnvironment environment, HexFootprint footprint, IHexHeatmap heatmap,
+        IHexHeatmap heatmap,
         HexRegion world, int level, HexCell cell)
     {
         var distance = cell.DistanceTo(world.Center);
         if (distance <= world.Radius)
         {
-            var population = level == 0
-                ? BasePopulation(environment, footprint, cell)
-                : heatmap.GetPopulation(level, cell);
+            var population = heatmap.GetPopulation(level, cell);
             return palette.GetDensityPaint(population);
         }
 
@@ -250,12 +246,4 @@ internal sealed class FrameRenderer(
             ? palette.WorldEdgePaint
             : palette.OutsidePaint;
     }
-
-    private static int BasePopulation(
-        IEnvironment environment, HexFootprint footprint, HexCell cell)
-    {
-        var (column, row) = footprint.ToOffset(cell);
-        return environment[column, row] == IEnvironment.EmptyCell ? 0 : 1;
-    }
-
 }

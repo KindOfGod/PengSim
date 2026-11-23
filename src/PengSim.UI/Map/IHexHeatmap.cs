@@ -9,7 +9,7 @@ internal interface IHexHeatmap
     /// <summary>Recounts occupied cells for the supplied iteration.</summary>
     void Rebuild(IEnvironment environment);
 
-    /// <summary>Gets the population in a bucket at the given aggregate zoom level.</summary>
+    /// <summary>Gets the population in a bucket at the given zoom level.</summary>
     int GetPopulation(int zoom, HexCell cell);
 
     /// <summary>Gets the enclosing hex region at the given aggregate zoom level.</summary>

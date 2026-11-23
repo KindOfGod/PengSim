@@ -3,70 +3,73 @@ using PengSim.BL.Contracts;
 
 namespace PengSim.BL.Model;
 
-/// <summary>Owns the environment and penguins for one simulation.</summary>
+/// <summary>Owns the penguins, working occupancy, and recorded positions of one run.</summary>
 internal sealed class Simulation : ISimulation
 {
-    private readonly Dictionary<int, IPenguin> _penguins = [];
-
+    private readonly Dictionary<ushort, IPenguin> _penguins = [];
+    private readonly HashSet<PenguinPosition> _occupied = [];
+    private readonly List<PenguinPosition> _initialPositions = [];
     private readonly List<IEnvironment> _frames = [];
-    private int[,] _cells;
 
-    /// <summary>Occupancy grids in chronological order, starting with initial placement.</summary>
     public IReadOnlyList<IEnvironment> Frames { get; }
+    public IReadOnlyDictionary<ushort, IPenguin> Penguins { get; }
 
-    /// <summary>Gets a live read-only lookup of penguins by occupancy ID.</summary>
-    public IReadOnlyDictionary<int, IPenguin> Penguins { get; }
-
-    private IEnvironment Environment => _frames[^1];
-
-    /// <summary>Creates an empty simulation with the given dimensions.</summary>
     public Simulation(int width, int height)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(width);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(width, (int)ISimulationEngine.MaxDimension);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(height);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(height, (int)ISimulationEngine.MaxDimension);
 
-        _cells = new int[height, width];
-        _frames.Add(new Environment(_cells));
+        _frames.Add(new Environment(width, height, _initialPositions.AsReadOnly()));
         Frames = _frames.AsReadOnly();
-        Penguins = new ReadOnlyDictionary<int, IPenguin>(_penguins);
+        Penguins = new ReadOnlyDictionary<ushort, IPenguin>(_penguins);
     }
 
-    public void Step()
-    {
-        var next = (int[,])_cells.Clone();
-        // Temporary turn rule: each penguin gets one move in placement order.
-        // Replace this loop when the simulation's movement rules are defined.
-        foreach (var penguin in _penguins.Values)
-        {
-            penguin.Move(next);
-        }
-        _frames.Add(new Environment(next));
-        _cells = next;
-    }
-
-    /// <summary>Places a penguin in an empty cell and returns its simulation-local ID.</summary>
-    public int AddPenguin(int column, int row)
+    public ushort AddPenguin(ushort column, ushort row)
     {
         if (_frames.Count > 1)
         {
             throw new InvalidOperationException("Place penguins before the first iteration.");
         }
 
-        ArgumentOutOfRangeException.ThrowIfNegative(column);
-        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(column, Environment.Width);
+        if (_penguins.Count >= ISimulationEngine.MaxPenguins)
+        {
+            throw new InvalidOperationException($"A simulation supports at most {ISimulationEngine.MaxPenguins} penguins.");
+        }
 
-        ArgumentOutOfRangeException.ThrowIfNegative(row);
-        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(row, Environment.Height);
-
-        if (Environment[column, row] != IEnvironment.EmptyCell)
+        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual((int)column, _frames[0].Width, nameof(column));
+        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual((int)row, _frames[0].Height, nameof(row));
+        var position = new PenguinPosition(column, row);
+        if (!_occupied.Add(position))
         {
             throw new InvalidOperationException("The cell already contains a penguin.");
         }
 
-        var id = _penguins.Count + 1;
-        _penguins.Add(id, new Penguin(id, column, row));
-        _cells[row, column] = id;
-
+        var id = (ushort)(_penguins.Count + 1);
+        _penguins.Add(id, new Penguin(id));
+        _initialPositions.Add(position);
         return id;
+    }
+
+    public void Step()
+    {
+        var previous = _frames[^1];
+        var next = new PenguinPosition[previous.Positions.Count];
+        for (var index = 0; index < next.Length; index++)
+        {
+            var id = (ushort)(index + 1);
+            var current = previous.Positions[index];
+            var destination = _penguins[id].Move(current, previous.Width, previous.Height, _occupied);
+            if (current != destination)
+            {
+                _occupied.Remove(current);
+                _occupied.Add(destination);
+            }
+
+            next[index] = destination;
+        }
+
+        _frames.Add(new Environment(previous.Width, previous.Height, Array.AsReadOnly(next)));
     }
 }

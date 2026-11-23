@@ -4,6 +4,8 @@
 - Use project classes through interfaces. Use interface types for dependencies, return values, and collections of model objects. Reference implementations at construction or registration sites. Coordinates, pixels, and other value types can be used directly.
 - Document every interface and every member it declares with an XML `<summary>`, including internal interfaces, constants, properties, indexers, and methods. Describe the contract from the caller’s perspective.
 - Order members within each C# type as follows: fields and constants, properties and indexers, constructors, public methods, then private methods. Group explicit interface methods with the methods that callers use. Primary constructors belong in the type declaration.
+- Use `ushort` for penguin IDs and stored offset coordinates (X and Y). Enforce at most 65,000 penguins and dimensions of 1–65,000 on each axis. Keep signed arithmetic for intermediate hex geometry and validate bounds before converting to `ushort`.
+- Store iteration history as read-only position arrays in consecutive ID order, with ID 1 at index 0. Allocate four coordinate bytes per penguin per completed iteration. Keep occupancy indexes for working state or the selected view only. Never store full 2D grids or dictionaries per iteration.
 - Keep the temporary inward movement rule in a private, demo-named method on Penguin. Call it from the IPenguin.Move implementation.
 - Update src/Doc/ai_doc.md when behavior or design changes. Record what changed and why. Keep the README’s render-profiling command current when profiling changes.
 

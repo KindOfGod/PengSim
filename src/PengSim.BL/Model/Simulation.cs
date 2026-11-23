@@ -8,7 +8,8 @@ public sealed class Simulation : ISimulation
 {
     private readonly Dictionary<int, IPenguin> _penguins = [];
 
-    private readonly List<IMutableEnvironment> _frames = [];
+    private readonly List<IEnvironment> _frames = [];
+    private int[,] _cells;
 
     /// <summary>Gets the environment that stores penguin positions.</summary>
     public IEnvironment Environment => _frames[^1];
@@ -22,21 +23,26 @@ public sealed class Simulation : ISimulation
     /// <summary>Creates an empty simulation with the given dimensions.</summary>
     public Simulation(int width, int height)
     {
-        _frames.Add(new Environment(width, height));
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(width);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(height);
+
+        _cells = new int[height, width];
+        _frames.Add(new Contracts.Environment(_cells));
         Frames = _frames.AsReadOnly();
         Penguins = new ReadOnlyDictionary<int, IPenguin>(_penguins);
     }
 
     public void Step()
     {
-        var next = _frames[^1].Copy();
+        var next = (int[,])_cells.Clone();
         // Temporary turn rule: each penguin gets one move in placement order.
         // Replace this loop when the simulation's movement rules are defined.
         foreach (var penguin in _penguins.Values)
         {
             penguin.Move(next);
         }
-        _frames.Add(next);
+        _frames.Add(new Contracts.Environment(next));
+        _cells = next;
     }
 
     /// <summary>Places a penguin in an empty cell and returns its simulation-local ID.</summary>
@@ -60,7 +66,7 @@ public sealed class Simulation : ISimulation
 
         var id = _penguins.Count + 1;
         _penguins.Add(id, new Penguin(id, column, row));
-        _frames[^1][column, row] = id;
+        _cells[row, column] = id;
 
         return id;
     }

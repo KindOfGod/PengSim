@@ -152,3 +152,7 @@ Run `PENGSIM_PROFILE=1 dotnet run --project src/PengSim.UI` to profile the analy
 ## 2026-11-23 — Isolate the demo movement rule
 
 IPenguin.Move delegates to the private MoveTowardCenterForDemo method. This identifies the inward step as a temporary demo rule and keeps it replaceable through the existing movement contract. The root AGENTS.md records the interface, member ordering, and documentation conventions.
+
+## 2026-11-23 — One environment contract for playback
+
+Environment and Penguin now live alongside their interfaces in Contracts. IEnvironment exposes dimensions and read-only occupancy. Simulation owns the row-major cell array. During placement the initial frame reflects added penguins. Each step clones the array once, applies the demo moves to that copy in placement order, and appends a read-only view of the completed grid. Earlier frames keep their own arrays. This removes the separate writable environment interface.

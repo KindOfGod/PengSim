@@ -160,3 +160,7 @@ Environment and Penguin now live alongside their interfaces in Contracts. IEnvir
 ## Simulation access through the engine
 
 ISimulationEngine is the public entry point for creation, placement, stepping, and playback history. The demo requests each step through the engine and passes its read-only Iterations list to the viewer. Index zero reflects placement until the first step. Each subsequent index holds a completed grid. Creating a new run starts a separate history. The mutable simulation is internal to the business layer.
+
+## Demo generation and screen responsibilities
+
+SimulationDemo coordinates the start menu, generation, and analysis. It places penguins and advances the engine, passing timing and population snapshots to IDemoScreen. DemoScreen owns menu shortcuts, progress formatting, and resize redraws. Redirected runs skip the menus and render the initial overview.

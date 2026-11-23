@@ -1,11 +1,14 @@
 namespace PengSim.UI.Demo;
 
-/// <summary>Displays demo menus and handles their keyboard shortcuts.</summary>
+/// <summary>Displays the demo menus and generation progress.</summary>
 internal interface IDemoScreen : IDisposable
 {
-    /// <summary>Draws a titled panel with the supplied text and foreground colors.</summary>
-    void Draw(string title, params (string Text, uint Color)[] lines);
+    /// <summary>Shows the main menu and returns true when the user chooses Run demo.</summary>
+    bool WaitForDemoStart();
 
-    /// <summary>Redraws on resize and returns true for the requested shortcut or false for Quit.</summary>
-    bool WaitFor(char shortcut, Action draw);
+    /// <summary>Displays the latest generation progress and timings.</summary>
+    void ShowProgress(DemoProgress progress);
+
+    /// <summary>Shows the completed run and returns true when the user chooses Analyze.</summary>
+    bool WaitForAnalysis(DemoProgress result);
 }

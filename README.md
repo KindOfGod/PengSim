@@ -1,6 +1,6 @@
 # PengSim
 
-PengSim is a .NET 10 terminal application for exploring a penguin simulation on a **hexagonal map**. Run demo places 1,000 penguins on distinct random cells inside a radius-32,499 hex on a 65,000 × 65,000 grid. It calculates 100,000 iterations and retains 100,001 frames (about 400 MB of coordinate data, plus runtime overhead). A progress bar shows the completed iterations and average iterations per second. When generation finishes, review the elapsed time, speed, and simulation details. Press A to analyze the run from its starting positions.
+PengSim is a .NET 10 terminal application for exploring a penguin simulation on a **hexagonal map**. Run demo places 500 penguins on distinct random cells inside a radius-124 hex on a 250 × 250 grid. It calculates 1,000 iterations and retains 1,001 frames (about 2 MB of coordinate data, plus runtime overhead). A progress bar shows the completed iterations and average iterations per second. When generation finishes, review the elapsed time, speed, and simulation details. Press A to analyze the run from its starting positions.
 
 ## Run
 
@@ -37,7 +37,6 @@ The **main map** shows the area you are looking at. The **minimap** shows the wh
 | Backspace | Pause and jump to the initial frame |
 | Left / right arrow | Pause and step back / forward one frame |
 | `1`–`9` / `0` | Play at the selected frames per second / pause |
-| `M` | Temporary playback shortcut for 240 iterations per second |
 | `R` | Reset view |
 | `Q` | Quit |
 

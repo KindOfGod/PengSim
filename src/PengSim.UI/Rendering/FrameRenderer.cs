@@ -25,7 +25,6 @@ internal sealed class FrameRenderer(
         ("Backspace", "rewind"),
         ("0", "pause"),
         ("1-9", "fps"),
-        ("M", "240 fps"),
         ("R", "reset"),
         ("Q", "quit"),
     ];

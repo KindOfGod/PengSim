@@ -18,7 +18,6 @@ internal sealed class EnvironmentDrawer(
 {
     // Bound the wait for keyboard input when paused or playing slowly.
     private const int InputPollMilliseconds = 8;
-    private const int TemporaryFastPlaybackFps = 240;
 
     // Coalesce key-repeat bursts into one camera update and one redraw.
     // Bound the batch so holding a key cannot indefinitely starve rendering.
@@ -95,9 +94,9 @@ internal sealed class EnvironmentDrawer(
                     iteration = Math.Clamp(iteration + (input.Key == ConsoleKey.LeftArrow ? -1 : 1),
                         0, frames.Count - 1);
                 }
-                else if (input.Key == ConsoleKey.M || char.IsAsciiDigit(input.KeyChar))
+                else if (char.IsAsciiDigit(input.KeyChar))
                 {
-                    speed = input.Key == ConsoleKey.M ? TemporaryFastPlaybackFps : input.KeyChar - '0';
+                    speed = input.KeyChar - '0';
                     if (speed > 0)
                     {
                         nextFrame = clock.Elapsed + TimeSpan.FromSeconds(1d / speed);

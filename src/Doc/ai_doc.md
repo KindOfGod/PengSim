@@ -210,3 +210,7 @@ The demo places 10,000 penguins on the 65,000 × 65,000 board. Its 100,001 frame
 ## Smaller demo population
 
 The demo now places 1,000 penguins. At four bytes per position, the initial frame and 100,000 completed steps hold 400,004,000 bytes of coordinate data.
+
+## 250 × 250 demo and playback controls
+
+The demo places 500 penguins on a 250 × 250 grid and records 1,000 steps. The 1,001 frames contain 2,002,000 bytes of coordinates. The temporary M shortcut has been removed. Keys 1–9 select playback speed and 0 pauses.

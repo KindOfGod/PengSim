@@ -144,3 +144,7 @@ Add an entry here when making a change or deciding how the simulation is designe
 
 - ISimulationEngine returns ISimulation. Frames expose the read-only IEnvironment grid and the ID lookup exposes IPenguin. Grid writes and frame copying use the internal IMutableEnvironment contract so model code can advance the simulation while renderers can only read frames.
 - The console entry point registers the demo, map, and rendering services with Autofac and resolves ISimulationDemo. Interface-returning factories create cameras and heatmaps for a footprint, buffers for a terminal size, and presenters for an interactive session. Coordinates, panel bounds, and pixels are value types.
+
+## 2026-11-23 — Render timing
+
+Run `PENGSIM_PROFILE=1 dotnet run --project src/PengSim.UI` to profile the analysis view. Each displayed map frame contributes one preparation sample (composing and encoding rows) and one output sample (presenting those rows). The initial heatmap build has its own timer. The report is written when the view exits, to `pengsim-profile.log` or the file named by `PENGSIM_PROFILE_PATH`. Simulation generation and later heatmap rebuilds are outside the frame timers.

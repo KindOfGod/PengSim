@@ -12,6 +12,14 @@ dotnet run --project src/PengSim.UI
 
 If input or output is redirected, the demo prints one plain-text overview and exits.
 
+## Measure render times
+
+```bash
+PENGSIM_PROFILE=1 dotnet run --project src/PengSim.UI
+```
+
+Run the demo, press **A** to analyze it, then navigate or play back frames. Press **Q** to write `pengsim-profile.log` in the working directory. The report includes the rendered frame count, initial heatmap build time, average frame preparation time, and average and slowest output updates. Set `PENGSIM_PROFILE_PATH` to choose another file. Redirected runs profile one overview frame.
+
 ## Visualization
 
 The **main map** shows the area you are looking at. The **minimap** shows the whole world, with yellow hexes outlining your current view.

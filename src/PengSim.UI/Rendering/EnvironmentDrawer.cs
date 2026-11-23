@@ -34,18 +34,38 @@ internal sealed class EnvironmentDrawer(
         var speed = 0;
         var nextFrame = TimeSpan.Zero;
         var clock = Stopwatch.StartNew();
+        using IRenderProfile? profile = System.Environment.GetEnvironmentVariable("PENGSIM_PROFILE") == "1"
+            ? new RenderProfile()
+            : null;
+        long Timestamp() => profile is null ? 0 : Stopwatch.GetTimestamp();
+
+        var started = Timestamp();
         var heatmap = createHeatmap(footprint);
         heatmap.Rebuild(frames[iteration]);
+        if (profile is not null) profile.Startup = Timestamp() - started;
         var camera = createCamera(footprint);
 
-        string[] Draw(FrameLayout layout, bool ansi = true) =>
-            frameRenderer.RenderRows(frames[iteration], footprint, heatmap, camera,
-                simulationName, iteration, frames.Count - 1, speed, layout, ansi);
+        void Draw(FrameLayout layout, ITerminalPresenter? presenter, int width, int height)
+        {
+            var preparing = Timestamp();
+            var rows = frameRenderer.RenderRows(frames[iteration], footprint, heatmap, camera,
+                simulationName, iteration, frames.Count - 1, speed, layout, ansi: presenter is not null);
+            var ready = Timestamp();
+            if (presenter is null)
+            {
+                foreach (var row in rows) Console.WriteLine(row);
+            }
+            else
+            {
+                presenter.Present(rows, width, height);
+            }
+            profile?.Record(ready - preparing, Timestamp() - ready);
+        }
 
         if (Console.IsInputRedirected || Console.IsOutputRedirected)
         {
             var layout = FrameLayout.Create(RedirectedOutputWidth, RedirectedOutputHeight);
-            foreach (var row in Draw(layout, ansi: false)) Console.WriteLine(row);
+            Draw(layout, null, RedirectedOutputWidth, RedirectedOutputHeight);
             return;
         }
 
@@ -53,7 +73,7 @@ internal sealed class EnvironmentDrawer(
         renderer.Start();
         var width = Console.WindowWidth;
         var height = Console.WindowHeight;
-        renderer.Present(Draw(FrameLayout.Create(width, height)), width, height);
+        Draw(FrameLayout.Create(width, height), renderer, width, height);
         var last = (camera.Center, camera.Level, width, height, iteration, speed);
         while (true)
         {
@@ -99,7 +119,7 @@ internal sealed class EnvironmentDrawer(
             if (state != last)
             {
                 if (iteration != last.iteration) heatmap.Rebuild(frames[iteration]);
-                renderer.Present(Draw(layout), width, height);
+                Draw(layout, renderer, width, height);
                 last = state;
             }
 

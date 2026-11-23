@@ -6,14 +6,14 @@ namespace PengSim.UI.Map;
 /// Multiplying both axial axes by a power of two preserves their orientation:
 /// no rotation or skew is introduced when zooming.
 /// </summary>
-internal static class HexGridScale
+internal sealed class HexGridScale : IHexGridScale
 {
     /// <summary>
     /// Rounds a base-level hex to its nearest hex center on a coarser,
     /// axis-aligned lattice. Deterministic cube-coordinate rounding assigns
     /// each base cell to exactly one display bucket.
     /// </summary>
-    public static HexCell ToLevel(HexCell cell, int level)
+    public HexCell ToLevel(HexCell cell, int level)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(level);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(level, 30);
@@ -49,7 +49,7 @@ internal static class HexGridScale
     }
 
     /// <summary>Returns the base-cell coordinate at a display bucket's center.</summary>
-    public static HexCell ToBase(HexCell cell, int level)
+    public HexCell ToBase(HexCell cell, int level)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(level);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(level, 30);

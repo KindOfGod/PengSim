@@ -5,7 +5,7 @@ namespace PengSim.UI.Map;
 /// Stores the camera in base-level axial coordinates. The display window is
 /// rectangular, but the world and the aggregation lattice remain hexagonal.
 /// </summary>
-internal sealed class MapCamera(HexFootprint footprint)
+internal sealed class MapCamera(HexFootprint footprint, IHexGridScale scale) : IMapCamera
 {
     public HexCell Center { get; private set; }
 
@@ -21,10 +21,10 @@ internal sealed class MapCamera(HexFootprint footprint)
         ArgumentOutOfRangeException.ThrowIfNegative(level);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(steps);
 
-        var current = HexGridScale.ToLevel(Center, level);
+        var current = scale.ToLevel(Center, level);
         var nextRow = current.R + vertical * steps;
         var nextColumn = current.Q + horizontal * steps + (current.R >> 1) - (nextRow >> 1);
-        var target = HexGridScale.ToBase(new HexCell(nextColumn, nextRow), level);
+        var target = scale.ToBase(new HexCell(nextColumn, nextRow), level);
         MoveToStorage(target);
     }
 
@@ -37,15 +37,6 @@ internal sealed class MapCamera(HexFootprint footprint)
         var (column, row) = footprint.ToOffset(Center);
         var next = footprint.ToAxial(column + horizontal, row + vertical);
         MoveToStorage(next);
-    }
-
-    private void MoveToStorage(HexCell requested)
-    {
-        var (column, row) = footprint.ToOffset(requested);
-
-        column = Math.Clamp(column, 0, footprint.Size - 1);
-        row = Math.Clamp(row, 0, footprint.Size - 1);
-        Center = footprint.ToAxial(column, row);
     }
 
     public void ZoomIn(int overviewLevel) =>
@@ -72,5 +63,14 @@ internal sealed class MapCamera(HexFootprint footprint)
     {
         Center = default;
         Level = null;
+    }
+
+    private void MoveToStorage(HexCell requested)
+    {
+        var (column, row) = footprint.ToOffset(requested);
+
+        column = Math.Clamp(column, 0, footprint.Size - 1);
+        row = Math.Clamp(row, 0, footprint.Size - 1);
+        Center = footprint.ToAxial(column, row);
     }
 }

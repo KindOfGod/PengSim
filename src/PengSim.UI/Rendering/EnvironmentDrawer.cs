@@ -1,6 +1,6 @@
 using System.Diagnostics;
 using PengSim.UI.Map;
-using HexEnvironment = PengSim.BL.Model.Environment;
+using PengSim.BL.Contracts;
 
 namespace PengSim.UI.Rendering;
 
@@ -10,10 +10,13 @@ namespace PengSim.UI.Rendering;
 /// TerminalPresenter publishes its changed rows in one buffered write.
 /// This separation avoids partial frames and per-hexagon terminal I/O.
 /// </summary>
-internal sealed class EnvironmentDrawer
+internal sealed class EnvironmentDrawer(
+    IFrameRenderer frameRenderer,
+    Func<HexFootprint, IHexHeatmap> createHeatmap,
+    Func<HexFootprint, IMapCamera> createCamera,
+    Func<ITerminalPresenter> createPresenter) : IEnvironmentDrawer
 {
-    // Without input, yield the CPU for 8 ms. A smaller value would spin more
-    // often; a much larger one would make keyboard navigation feel sluggish.
+    // Bound the wait for keyboard input when paused or playing slowly.
     private const int InputPollMilliseconds = 8;
 
     // Coalesce key-repeat bursts into one camera update and one redraw.
@@ -24,32 +27,52 @@ internal sealed class EnvironmentDrawer
     private const int RedirectedOutputWidth = 101;
     private const int RedirectedOutputHeight = 35;
 
-    public void Show(IReadOnlyList<HexEnvironment> frames, HexFootprint footprint, string simulationName)
+    public void Show(IReadOnlyList<IEnvironment> frames, HexFootprint footprint, string simulationName)
     {
         var iteration = 0;
         var speed = 0;
         var nextFrame = TimeSpan.Zero;
         var clock = Stopwatch.StartNew();
-        var heatmap = new HexHeatmap(footprint);
-        heatmap.Rebuild(frames[iteration]);
-        var camera = new MapCamera(footprint);
+        using IRenderProfile? profile = System.Environment.GetEnvironmentVariable("PENGSIM_PROFILE") == "1"
+            ? new RenderProfile()
+            : null;
+        long Timestamp() => profile is null ? 0 : Stopwatch.GetTimestamp();
 
-        string[] Draw(FrameLayout layout, bool ansi = true) =>
-            FrameRenderer.RenderRows(frames[iteration], footprint, heatmap, camera,
-                simulationName, iteration, frames.Count - 1, speed, layout, ansi);
+        var started = Timestamp();
+        var heatmap = createHeatmap(footprint);
+        heatmap.Rebuild(frames[iteration]);
+        if (profile is not null) profile.Startup = Timestamp() - started;
+        var camera = createCamera(footprint);
+
+        void Draw(FrameLayout layout, ITerminalPresenter? presenter, int width, int height)
+        {
+            var preparing = Timestamp();
+            var rows = frameRenderer.RenderRows(footprint, heatmap, camera,
+                simulationName, iteration, frames.Count - 1, speed, layout, ansi: presenter is not null);
+            var ready = Timestamp();
+            if (presenter is null)
+            {
+                foreach (var row in rows) Console.WriteLine(row);
+            }
+            else
+            {
+                presenter.Present(rows, width, height);
+            }
+            profile?.Record(ready - preparing, Timestamp() - ready);
+        }
 
         if (Console.IsInputRedirected || Console.IsOutputRedirected)
         {
             var layout = FrameLayout.Create(RedirectedOutputWidth, RedirectedOutputHeight);
-            foreach (var row in Draw(layout, ansi: false)) Console.WriteLine(row);
+            Draw(layout, null, RedirectedOutputWidth, RedirectedOutputHeight);
             return;
         }
 
-        using var renderer = new TerminalPresenter();
+        using var renderer = createPresenter();
         renderer.Start();
         var width = Console.WindowWidth;
         var height = Console.WindowHeight;
-        renderer.Present(Draw(FrameLayout.Create(width, height)), width, height);
+        Draw(FrameLayout.Create(width, height), renderer, width, height);
         var last = (camera.Center, camera.Level, width, height, iteration, speed);
         while (true)
         {
@@ -60,7 +83,7 @@ internal sealed class EnvironmentDrawer
             while (count < MaxKeysPerFrame && Console.KeyAvailable)
             {
                 var input = Console.ReadKey(intercept: true);
-                if (input.Key == ConsoleKey.Home)
+                if (input.Key == ConsoleKey.Backspace)
                 {
                     iteration = 0;
                     speed = 0;
@@ -74,7 +97,10 @@ internal sealed class EnvironmentDrawer
                 else if (char.IsAsciiDigit(input.KeyChar))
                 {
                     speed = input.KeyChar - '0';
-                    if (speed > 0) nextFrame = clock.Elapsed + TimeSpan.FromSeconds(1d / speed);
+                    if (speed > 0)
+                    {
+                        nextFrame = clock.Elapsed + TimeSpan.FromSeconds(1d / speed);
+                    }
                 }
                 else if (!Navigate(input, camera, heatmap, layout))
                 {
@@ -84,22 +110,34 @@ internal sealed class EnvironmentDrawer
                 count++;
             }
 
-            if (speed > 0 && clock.Elapsed >= nextFrame)
+            var now = clock.Elapsed;
+            if (speed > 0 && now >= nextFrame)
             {
-                iteration = Math.Min(iteration + 1, frames.Count - 1);
-                nextFrame += TimeSpan.FromSeconds(1d / speed);
+                var interval = TimeSpan.FromSeconds(1d / speed);
+                var due = 1 + (now - nextFrame).Ticks / interval.Ticks;
+                var advance = (int)Math.Min(due, frames.Count - 1 - iteration);
+                iteration += advance;
+                nextFrame += interval * advance;
             }
-            if (iteration == frames.Count - 1) speed = 0;
+            if (iteration == frames.Count - 1)
+            {
+                speed = 0;
+            }
 
             var state = (camera.Center, camera.Level, width, height, iteration, speed);
             if (state != last)
             {
                 if (iteration != last.iteration) heatmap.Rebuild(frames[iteration]);
-                renderer.Present(Draw(layout), width, height);
+                Draw(layout, renderer, width, height);
                 last = state;
             }
 
-            if (count == 0) Thread.Sleep(InputPollMilliseconds);
+            if (count == 0)
+            {
+                var wait = speed == 0 ? InputPollMilliseconds
+                    : Math.Clamp((nextFrame - clock.Elapsed).TotalMilliseconds, 0, InputPollMilliseconds);
+                Thread.Sleep((int)Math.Ceiling(wait));
+            }
         }
     }
 
@@ -108,7 +146,7 @@ internal sealed class EnvironmentDrawer
     /// moves one base hex. Zoom never alters the BL's playable world geometry.
     /// </summary>
     private static bool Navigate(
-        ConsoleKeyInfo input, MapCamera camera, HexHeatmap heatmap, FrameLayout layout)
+        ConsoleKeyInfo input, IMapCamera camera, IHexHeatmap heatmap, FrameLayout layout)
     {
         if (input.Key == ConsoleKey.Q)
         {

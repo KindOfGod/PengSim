@@ -1,75 +1,78 @@
 using System.Diagnostics;
 using PengSim.BL.Contracts;
+using PengSim.BL.Model;
 using PengSim.UI.Map;
 using PengSim.UI.Rendering;
 
 namespace PengSim.UI.Demo;
 
-internal sealed class SimulationDemo(ISimulationEngine engine, EnvironmentDrawer drawer)
+internal sealed class SimulationDemo(
+    ISimulationEngine engine, IEnvironmentDrawer drawer, Func<IDemoScreen> createScreen) : ISimulationDemo
 {
-    private const int Steps = 1000;
-    private const int Population = 5000;
+    private const int PenguinCount = 500;
+    private const int IterationCount = 1_000;
+    private static readonly HexFootprint Board = new(size: 250);
+    private static readonly TimeSpan ProgressInterval = TimeSpan.FromMilliseconds(100);
 
     public void Run()
     {
         var interactive = !Console.IsInputRedirected && !Console.IsOutputRedirected;
-        using var screen = interactive ? new DemoScreen() : null;
-        const uint accent = HeatmapPalette.Accent;
-        const uint normal = HeatmapPalette.DefaultColor;
-        if (screen is not null && !DemoScreen.WaitFor('2', () => screen.Draw("Main menu",
-            ("Create simulation (coming soon)", 0x949494),
-            ("[2] Run demo", accent),
-            ("", normal),
-            ("[Q] Quit", normal)))) return;
-
-        var total = Stopwatch.StartNew();
-        var footprint = new HexFootprint(Radius: 150);
-        var simulation = engine.CreateSimulation(footprint.Size, footprint.Size);
-        var cells = footprint.Region.Cells().ToArray();
-        Random.Shared.Shuffle(cells);
-        foreach (var cell in cells.Take(Population))
+        using var screen = interactive ? createScreen() : null;
+        if (screen is not null && !screen.WaitForDemoStart())
         {
-            var (column, row) = footprint.ToOffset(cell);
-            simulation.AddPenguin(column, row);
+            return;
         }
 
-        var clock = Stopwatch.StartNew();
-        var nextUpdate = TimeSpan.Zero;
-
-        for (var step = 1; step <= Steps; step++)
+        var result = GenerateDemo(screen);
+        if (screen is not null && !screen.WaitForAnalysis(result))
         {
-            simulation.Step();
-            var elapsed = clock.Elapsed;
-            if (interactive && (elapsed >= nextUpdate || step == Steps))
+            return;
+        }
+
+        drawer.Show(engine.Iterations, Board, "Penguin demo");
+    }
+
+    private DemoProgress GenerateDemo(IDemoScreen? screen)
+    {
+        var totalTime = Stopwatch.StartNew();
+        engine.CreateSimulation(Board.Size, Board.Size);
+        PlacePenguins();
+
+        var iterationTime = Stopwatch.StartNew();
+        var nextUpdate = TimeSpan.Zero;
+        for (var step = 1; step <= IterationCount; step++)
+        {
+            engine.Step();
+            var elapsed = iterationTime.Elapsed;
+            if (screen is not null && (elapsed >= nextUpdate || step == IterationCount))
             {
-                DrawProgress(step, elapsed, completed: false);
-                nextUpdate = elapsed + TimeSpan.FromMilliseconds(100);
+                screen.ShowProgress(GetProgress(totalTime.Elapsed, elapsed));
+                nextUpdate = elapsed + ProgressInterval;
             }
         }
 
-        clock.Stop();
-        total.Stop();
-        if (screen is not null && !DemoScreen.WaitFor('A',
-            () => DrawProgress(Steps, clock.Elapsed, completed: true))) return;
+        iterationTime.Stop();
+        totalTime.Stop();
+        return GetProgress(totalTime.Elapsed, iterationTime.Elapsed);
+    }
 
-        drawer.Show(simulation.Frames, footprint, "Penguin demo");
-
-        void DrawProgress(int step, TimeSpan elapsed, bool completed)
+    private void PlacePenguins()
+    {
+        var placed = new HashSet<PenguinPosition>(PenguinCount);
+        while (placed.Count < PenguinCount)
         {
-            const int barWidth = 22;
-            var filled = barWidth * step / Steps;
-            var bar = new string('█', filled) + new string('░', barWidth - filled);
-            screen!.Draw(completed ? "Demo complete" : "Generating demo",
-                ($"{bar}  {step * 100 / Steps}%", accent),
-                ($"Steps      {step:N0} / {Steps:N0}", normal),
-                ($"Elapsed    {total.Elapsed.TotalSeconds:F3} s", normal),
-                ($"Speed      {step / elapsed.TotalSeconds:N1} steps/s", normal),
-                ("", normal),
-                ($"Penguins   {simulation.Penguins.Count:N0}", normal),
-                ($"Map        Radius {footprint.Radius} · {cells.Length:N0} hexes", normal),
-                ($"Frames     {simulation.Frames.Count:N0} in memory", normal),
-                ("", normal),
-                (completed ? "[A] Analyze    [Q] Quit" : "Calculating steps…", accent));
+            var x = (ushort)Random.Shared.Next(Board.Size);
+            var y = (ushort)Random.Shared.Next(Board.Size);
+            if (Board.Contains(x, y) && placed.Add(new PenguinPosition(x, y)))
+            {
+                engine.AddPenguin(x, y);
+            }
         }
+    }
+
+    private DemoProgress GetProgress(TimeSpan totalTime, TimeSpan iterationTime)
+    {
+        return new DemoProgress(engine.Iterations.Count - 1, IterationCount, totalTime,
+            iterationTime, engine.Penguins.Count, Board.Size);
     }
 }

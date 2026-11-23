@@ -1,36 +1,32 @@
+using System.Collections.ObjectModel;
+using PengSim.BL.Contracts;
+
 namespace PengSim.BL.Model;
 
-/// <summary>A pointy-topped hex grid with odd rows offset right by half a cell.</summary>
-public sealed class Environment
+/// <summary>Read-only positions for one simulation iteration.</summary>
+public sealed class Environment : IEnvironment
 {
-    /// <summary>The value stored for cells without a penguin.</summary>
-    public const int EmptyCell = 0;
+    private readonly ReadOnlyCollection<PenguinPosition> _positions;
 
-    private readonly int[,] _cells;
+    public ushort Width { get; }
+    public ushort Height { get; }
+    public IReadOnlyList<PenguinPosition> Positions => _positions;
 
-    /// <summary>Allocates an empty grid with the given dimensions.</summary>
-    internal Environment(int width, int height)
+    public ushort this[ushort column, ushort row]
     {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(width);
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(height);
-
-        _cells = new int[height, width];
+        get
+        {
+            ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(column, Width);
+            ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(row, Height);
+            var index = _positions.IndexOf(new PenguinPosition(column, row));
+            return (ushort)(index + 1);
+        }
     }
 
-    private Environment(Environment previous) => _cells = (int[,])previous._cells.Clone();
-
-    internal Environment Copy() => new(this);
-
-    /// <summary>Gets the number of columns.</summary>
-    public int Width => _cells.GetLength(1);
-
-    /// <summary>Gets the number of rows.</summary>
-    public int Height => _cells.GetLength(0);
-
-    /// <summary>Gets the occupancy ID at a column and row, or zero for an empty cell.</summary>
-    public int this[int column, int row]
+    internal Environment(ushort width, ushort height, ReadOnlyCollection<PenguinPosition> positions)
     {
-        get => _cells[row, column];
-        internal set => _cells[row, column] = value;
+        Width = width;
+        Height = height;
+        _positions = positions;
     }
 }

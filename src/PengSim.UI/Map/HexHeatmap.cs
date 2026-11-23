@@ -1,5 +1,5 @@
 using HexCell = PengSim.BL.Model.HexCell;
-using HexEnvironment = PengSim.BL.Model.Environment;
+using PengSim.BL.Contracts;
 
 namespace PengSim.UI.Map;
 
@@ -8,16 +8,19 @@ namespace PengSim.UI.Map;
 /// world-aligned hexagonal zoom levels. Geometry is fixed; counts can be
 /// rebuilt once after each simulation step.
 /// </summary>
-internal sealed class HexHeatmap
+internal sealed class HexHeatmap : IHexHeatmap
 {
     private const int MaximumZoomLevel = 30;
 
+    private readonly IHexGridScale _scale;
     private readonly HexFootprint _footprint;
+    private readonly HashSet<HexCell> _baseCells = [];
     private readonly List<Level> _levels = [];
 
-    public HexHeatmap(HexFootprint footprint)
+    public HexHeatmap(HexFootprint footprint, IHexGridScale scale)
     {
         _footprint = footprint;
+        _scale = scale;
 
         // World size and bucket coordinates never change between iterations.
         // Only keep the enclosing hex for each zoom level, not every base cell.
@@ -38,7 +41,7 @@ internal sealed class HexHeatmap
     /// Reuse the dictionaries to avoid allocations on every iteration.
     /// Navigation and zooming only read these counts; they never rebuild them.
     /// </summary>
-    public void Rebuild(HexEnvironment environment)
+    public void Rebuild(IEnvironment environment)
     {
         if (environment.Width != _footprint.Size || environment.Height != _footprint.Size)
         {
@@ -50,18 +53,19 @@ internal sealed class HexHeatmap
             level.Counts.Clear();
         }
 
-        // Scan the world once, counting only occupied base-level hex cells.
-        foreach (var cell in _footprint.Region.Cells())
+        _baseCells.Clear();
+        foreach (var position in environment.Positions)
         {
-            var (column, row) = _footprint.ToOffset(cell);
-            if (environment[column, row] == HexEnvironment.EmptyCell)
+            var cell = _footprint.ToAxial(position.X, position.Y);
+            if (!_footprint.Region.Contains(cell))
             {
                 continue;
             }
 
+            _baseCells.Add(cell);
             for (var zoom = 1; zoom <= _levels.Count; zoom++)
             {
-                var bucket = HexGridScale.ToLevel(cell, zoom);
+                var bucket = _scale.ToLevel(cell, zoom);
                 var counts = _levels[zoom - 1].Counts;
                 counts[bucket] = counts.GetValueOrDefault(bucket) + 1;
             }
@@ -69,8 +73,15 @@ internal sealed class HexHeatmap
     }
 
     /// <summary>Absent entries represent empty buckets.</summary>
-    public int GetPopulation(int zoom, HexCell cell) =>
-        _levels[zoom - 1].Counts.GetValueOrDefault(cell);
+    public int GetPopulation(int zoom, HexCell cell)
+    {
+        if (zoom == 0)
+        {
+            return _baseCells.Contains(cell) ? 1 : 0;
+        }
+
+        return _levels[zoom - 1].Counts.GetValueOrDefault(cell);
+    }
 
     public HexRegion GetRegion(int zoom) => _levels[zoom - 1].Region;
 
@@ -90,7 +101,7 @@ internal sealed class HexHeatmap
     /// Find the enclosing coarse-world radius from the two ends of each
     /// hexagonal row. Interior points cannot extend its outer radius.
     /// </summary>
-    private static int GetCoarseRadius(int radius, int zoom)
+    private int GetCoarseRadius(int radius, int zoom)
     {
         var result = 0;
         for (var row = -radius; row <= radius; row++)
@@ -98,12 +109,12 @@ internal sealed class HexHeatmap
             var left = new HexCell(Math.Max(-radius, -row - radius), row);
             var right = new HexCell(Math.Min(radius, -row + radius), row);
             result = Math.Max(result, Math.Max(
-                HexGridScale.ToLevel(left, zoom).DistanceTo(default),
-                HexGridScale.ToLevel(right, zoom).DistanceTo(default)));
+                _scale.ToLevel(left, zoom).DistanceTo(default),
+                _scale.ToLevel(right, zoom).DistanceTo(default)));
         }
 
         return result;
     }
 
-    private sealed record Level(HexRegion Region, Dictionary<HexCell, int> Counts);
+    private readonly record struct Level(HexRegion Region, Dictionary<HexCell, int> Counts);
 }

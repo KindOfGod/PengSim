@@ -1,25 +1,33 @@
+using PengSim.BL.Contracts;
+
 namespace PengSim.BL.Model;
 
 /// <summary>Represents an individual penguin in a simulation.</summary>
-public sealed class Penguin
+public sealed class Penguin : IPenguin
 {
     private static readonly (int Q, int R)[] Directions =
         [(1, 0), (0, 1), (-1, 1), (-1, 0), (0, -1), (1, -1)];
 
-    private readonly int _id;
-    private int _column;
-    private int _row;
+    public ushort Id { get; }
 
-    internal Penguin(int id, int column, int row) =>
-        (_id, _column, _row) = (id, column, row);
-
-    /// <summary>Moves into the nearest available inward neighbor, if one exists.</summary>
-    internal void Move(Environment grid)
+    internal Penguin(ushort id)
     {
-        var center = HexCell.FromOffset(grid.Width / 2, grid.Height / 2);
-        var current = HexCell.FromOffset(_column, _row);
+        Id = id;
+    }
+
+    PenguinPosition IPenguin.Move(PenguinPosition current, ushort width, ushort height, IReadOnlySet<PenguinPosition> occupied)
+    {
+        return MoveTowardCenterForDemo(current, width, height, occupied);
+    }
+
+    /// <summary>Temporary demo rule: move to an available inward neighbor.</summary>
+    private static PenguinPosition MoveTowardCenterForDemo(
+        PenguinPosition position, ushort width, ushort height, IReadOnlySet<PenguinPosition> occupied)
+    {
+        var center = HexCell.FromOffset(width / 2, height / 2);
+        var current = HexCell.FromOffset(position.X, position.Y);
         var distance = current.DistanceTo(center);
-        var destination = (_column, _row);
+        var destination = position;
         var bestScore = long.MaxValue;
 
         foreach (var (dq, dr) in Directions)
@@ -27,26 +35,29 @@ public sealed class Penguin
             var neighbor = new HexCell(current.Q + dq, current.R + dr);
             var row = neighbor.R;
             var column = neighbor.Q + (row >> 1);
-            if (column < 0 || column >= grid.Width || row < 0 || row >= grid.Height
-                || grid[column, row] != Environment.EmptyCell || neighbor.DistanceTo(center) >= distance)
+            if (column < 0 || column >= width || row < 0 || row >= height
+                || neighbor.DistanceTo(center) >= distance)
+            {
+                continue;
+            }
+
+            var candidate = new PenguinPosition((ushort)column, (ushort)row);
+            if (occupied.Contains(candidate))
             {
                 continue;
             }
 
             // Break ties between shortest hex paths by physical distance to the center.
-            long q = neighbor.Q - center.Q, r = row - center.R;
+            var q = (long)neighbor.Q - center.Q;
+            var r = (long)row - center.R;
             var score = q * q + q * r + r * r;
             if (score < bestScore)
             {
                 bestScore = score;
-                destination = (column, row);
+                destination = candidate;
             }
         }
 
-        if (destination == (_column, _row)) return;
-
-        grid[_column, _row] = Environment.EmptyCell;
-        (_column, _row) = destination;
-        grid[_column, _row] = _id;
+        return destination;
     }
 }

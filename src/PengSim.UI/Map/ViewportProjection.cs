@@ -35,14 +35,7 @@ internal readonly record struct MinimapViewport(int Left, int Top, int Right, in
         (x - Left <= HorizontalBorderWidth ||
          Right - x <= HorizontalBorderWidth ||
          y == Top || y == Bottom);
-}
 
-/// <summary>
-/// The hex display levels all share the same physical axes. Converting
-/// between them is now an isotropic power-of-two scale, not a rotation.
-/// </summary>
-internal static class ViewportProjection
-{
     /// <summary>
     /// A zoom step multiplies the distance between neighboring display-hex
     /// centers by two. Project the screen center and half-sizes separately:

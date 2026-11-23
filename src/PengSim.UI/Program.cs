@@ -1,21 +1,22 @@
 using Autofac;
 using PengSim.BL;
 using PengSim.UI.Demo;
+using PengSim.UI.Map;
 using PengSim.UI.Rendering;
 
-namespace PengSim.UI;
+var builder = new ContainerBuilder();
+builder.RegisterModule<SimulationModule>();
+builder.RegisterType<HexGridScale>().As<IHexGridScale>();
+builder.RegisterType<HeatmapPalette>().As<IHeatmapPalette>();
+builder.RegisterInstance<CreateTerminalBuffer>((width, height) => new TerminalBuffer(width, height));
+builder.RegisterType<HexHeatmap>().As<IHexHeatmap>();
+builder.RegisterType<MapCamera>().As<IMapCamera>();
+builder.RegisterType<FrameRenderer>().As<IFrameRenderer>();
+builder.RegisterType<EnvironmentDrawer>().As<IEnvironmentDrawer>();
+// Each terminal session disposes its screen and presenter when it exits.
+builder.RegisterType<TerminalPresenter>().As<ITerminalPresenter>().ExternallyOwned();
+builder.RegisterType<DemoScreen>().As<IDemoScreen>().ExternallyOwned();
+builder.RegisterType<SimulationDemo>().As<ISimulationDemo>();
 
-/// <summary>Configures the console demo dependencies.</summary>
-internal static class Program
-{
-    private static void Main()
-    {
-        var builder = new ContainerBuilder();
-        builder.RegisterModule<SimulationModule>();
-        builder.RegisterType<EnvironmentDrawer>();
-        builder.RegisterType<SimulationDemo>();
-
-        using var container = builder.Build();
-        container.Resolve<SimulationDemo>().Run();
-    }
-}
+using var container = builder.Build();
+container.Resolve<ISimulationDemo>().Run();

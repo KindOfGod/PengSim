@@ -8,15 +8,18 @@ public sealed class Penguin : IPenguin
     private static readonly (int Q, int R)[] Directions =
         [(1, 0), (0, 1), (-1, 1), (-1, 0), (0, -1), (1, -1)];
 
-    public int Id { get; }
     private int _column;
     private int _row;
+
+    public int Id { get; }
 
     internal Penguin(int id, int column, int row) =>
         (Id, _column, _row) = (id, column, row);
 
-    /// <summary>Moves into the nearest available inward neighbor, if one exists.</summary>
-    void IPenguin.Move(IMutableEnvironment grid)
+    void IPenguin.Move(IMutableEnvironment grid) => MoveTowardCenterForDemo(grid);
+
+    /// <summary>Temporary demo rule: move to an available inward neighbor.</summary>
+    private void MoveTowardCenterForDemo(IMutableEnvironment grid)
     {
         var center = HexCell.FromOffset(grid.Width / 2, grid.Height / 2);
         var current = HexCell.FromOffset(_column, _row);

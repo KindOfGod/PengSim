@@ -148,3 +148,7 @@ Add an entry here when making a change or deciding how the simulation is designe
 ## 2026-11-23 — Render timing
 
 Run `PENGSIM_PROFILE=1 dotnet run --project src/PengSim.UI` to profile the analysis view. Each displayed map frame contributes one preparation sample (composing and encoding rows) and one output sample (presenting those rows). The initial heatmap build has its own timer. The report is written when the view exits, to `pengsim-profile.log` or the file named by `PENGSIM_PROFILE_PATH`. Simulation generation and later heatmap rebuilds are outside the frame timers.
+
+## 2026-11-23 — Isolate the demo movement rule
+
+IPenguin.Move delegates to the private MoveTowardCenterForDemo method. This identifies the inward step as a temporary demo rule and keeps it replaceable through the existing movement contract. The root AGENTS.md records the interface, member ordering, and documentation conventions.

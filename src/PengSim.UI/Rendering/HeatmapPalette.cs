@@ -3,9 +3,6 @@ namespace PengSim.UI.Rendering;
 /// <summary>Maps population counts to terminal glyphs and foreground colors.</summary>
 internal sealed class HeatmapPalette : IHeatmapPalette
 {
-    public TerminalPixel OutsidePaint { get; } = new('·', 0x444444);
-    public TerminalPixel WorldEdgePaint { get; } = new('·', IHeatmapPalette.Accent);
-
     // Corresponds to 0, 1, 2, 3-4, 5-7, 8-15, 16-31, 32-63, 64-127,
     // and 128+ penguins respectively. Empty cells use a hollow hex glyph.
     private static readonly TerminalPixel[] Bands =
@@ -21,6 +18,9 @@ internal sealed class HeatmapPalette : IHeatmapPalette
         new('⬢', 0xd75f5f),
         new('⬢', 0xff0000),
     ];
+
+    public TerminalPixel OutsidePaint { get; } = new('·', 0x444444);
+    public TerminalPixel WorldEdgePaint { get; } = new('·', IHeatmapPalette.Accent);
 
     public ReadOnlySpan<TerminalPixel> DensityBands => Bands;
 

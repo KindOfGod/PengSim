@@ -10,6 +10,15 @@ public sealed class Simulation : ISimulation
 
     private readonly List<IMutableEnvironment> _frames = [];
 
+    /// <summary>Gets the environment that stores penguin positions.</summary>
+    public IEnvironment Environment => _frames[^1];
+
+    /// <summary>Occupancy grids in chronological order, starting with initial placement.</summary>
+    public IReadOnlyList<IEnvironment> Frames { get; }
+
+    /// <summary>Gets a live read-only lookup of penguins by occupancy ID.</summary>
+    public IReadOnlyDictionary<int, IPenguin> Penguins { get; }
+
     /// <summary>Creates an empty simulation with the given dimensions.</summary>
     public Simulation(int width, int height)
     {
@@ -17,12 +26,6 @@ public sealed class Simulation : ISimulation
         Frames = _frames.AsReadOnly();
         Penguins = new ReadOnlyDictionary<int, IPenguin>(_penguins);
     }
-
-    /// <summary>Gets the environment that stores penguin positions.</summary>
-    public IEnvironment Environment => _frames[^1];
-
-    /// <summary>Occupancy grids in chronological order, starting with initial placement.</summary>
-    public IReadOnlyList<IEnvironment> Frames { get; }
 
     public void Step()
     {
@@ -35,9 +38,6 @@ public sealed class Simulation : ISimulation
         }
         _frames.Add(next);
     }
-
-    /// <summary>Gets a live read-only lookup of penguins by occupancy ID.</summary>
-    public IReadOnlyDictionary<int, IPenguin> Penguins { get; }
 
     /// <summary>Places a penguin in an empty cell and returns its simulation-local ID.</summary>
     public int AddPenguin(int column, int row)

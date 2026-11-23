@@ -39,15 +39,6 @@ internal sealed class MapCamera(HexFootprint footprint, IHexGridScale scale) : I
         MoveToStorage(next);
     }
 
-    private void MoveToStorage(HexCell requested)
-    {
-        var (column, row) = footprint.ToOffset(requested);
-
-        column = Math.Clamp(column, 0, footprint.Size - 1);
-        row = Math.Clamp(row, 0, footprint.Size - 1);
-        Center = footprint.ToAxial(column, row);
-    }
-
     public void ZoomIn(int overviewLevel) =>
         Level = Math.Max(0, (Level ?? overviewLevel) - 1);
 
@@ -72,5 +63,14 @@ internal sealed class MapCamera(HexFootprint footprint, IHexGridScale scale) : I
     {
         Center = default;
         Level = null;
+    }
+
+    private void MoveToStorage(HexCell requested)
+    {
+        var (column, row) = footprint.ToOffset(requested);
+
+        column = Math.Clamp(column, 0, footprint.Size - 1);
+        row = Math.Clamp(row, 0, footprint.Size - 1);
+        Center = footprint.ToAxial(column, row);
     }
 }

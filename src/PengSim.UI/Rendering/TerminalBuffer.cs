@@ -50,9 +50,6 @@ internal sealed class TerminalBuffer : ITerminalBuffer
         }
     }
 
-    private void Put(int x, int y, char glyph, uint color) =>
-        Put(x, y, new TerminalPixel(glyph, color));
-
     /// <summary>
     /// Write clipped text directly to cells. Control bytes are sanitized
     /// so a simulation name/path cannot issue terminal escape commands.
@@ -146,4 +143,7 @@ internal sealed class TerminalBuffer : ITerminalBuffer
 
         return result;
     }
+
+    private void Put(int x, int y, char glyph, uint color) =>
+        Put(x, y, new TerminalPixel(glyph, color));
 }

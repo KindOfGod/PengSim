@@ -37,6 +37,10 @@ internal readonly record struct FrameLayout(
     public bool Fits => Width >= 24 && Height >= 14;
     public int LegendRow => Map.Y + Map.Height;
 
+    /// <summary>Normal pan moves about one sixth of the visible display.</summary>
+    public int PanStride => Math.Max(1,
+        Math.Min((Main.Width - 2) / 2, Main.Height - 2) / 6);
+
     public static FrameLayout Create(int terminalWidth, int terminalHeight)
     {
         var width = Math.Max(0, terminalWidth - EdgeMargin);
@@ -81,8 +85,4 @@ internal readonly record struct FrameLayout(
             Math.Min((availableWidth - 3) / 4, (availableHeight - 3) / 2));
         return heatmap.FitWorld(radius);
     }
-
-    /// <summary>Normal pan moves about one sixth of the visible display.</summary>
-    public int PanStride => Math.Max(1,
-        Math.Min((Main.Width - 2) / 2, Main.Height - 2) / 6);
 }

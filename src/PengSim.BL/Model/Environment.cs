@@ -10,19 +10,6 @@ public sealed class Environment : IMutableEnvironment
 
     private readonly int[,] _cells;
 
-    /// <summary>Allocates an empty grid with the given dimensions.</summary>
-    internal Environment(int width, int height)
-    {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(width);
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(height);
-
-        _cells = new int[height, width];
-    }
-
-    private Environment(int[,] cells) => _cells = cells;
-
-    IMutableEnvironment IMutableEnvironment.Copy() => new Environment((int[,])_cells.Clone());
-
     /// <summary>Gets the number of columns.</summary>
     public int Width => _cells.GetLength(1);
 
@@ -37,4 +24,17 @@ public sealed class Environment : IMutableEnvironment
         get => _cells[row, column];
         set => _cells[row, column] = value;
     }
+
+    /// <summary>Allocates an empty grid with the given dimensions.</summary>
+    internal Environment(int width, int height)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(width);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(height);
+
+        _cells = new int[height, width];
+    }
+
+    private Environment(int[,] cells) => _cells = cells;
+
+    IMutableEnvironment IMutableEnvironment.Copy() => new Environment((int[,])_cells.Clone());
 }

@@ -1,4 +1,6 @@
-namespace PengSim.BL.Contracts;
+using PengSim.BL.Contracts;
+
+namespace PengSim.BL.Model;
 
 /// <summary>A read-only view of occupancy in one simulation frame.</summary>
 public sealed class Environment : IEnvironment

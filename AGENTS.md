@@ -1,5 +1,6 @@
 # PengSim repository conventions
 
+- Reserve the `Contracts` folder and namespace for interfaces. Place concrete domain types in `Model`.
 - Use project classes through interfaces. Use interface types for dependencies, return values, and collections of model objects. Reference implementations at construction or registration sites. Coordinates, pixels, and other value types can be used directly.
 - Document every interface and every member it declares with an XML `<summary>`, including internal interfaces, constants, properties, indexers, and methods. Describe the contract from the caller’s perspective.
 - Order members within each C# type as follows: fields and constants, properties and indexers, constructors, public methods, then private methods. Group explicit interface methods with the methods that callers use. Primary constructors belong in the type declaration.

@@ -155,7 +155,7 @@ IPenguin.Move delegates to the private MoveTowardCenterForDemo method. This iden
 
 ## 2026-11-23 — One environment contract for playback
 
-Environment and Penguin now live alongside their interfaces in Contracts. IEnvironment exposes dimensions and read-only occupancy. Simulation owns the row-major cell array. During placement the initial frame reflects added penguins. Each step clones the array once, applies the demo moves to that copy in placement order, and appends a read-only view of the completed grid. Earlier frames keep their own arrays. This removes the separate writable environment interface.
+IEnvironment exposes dimensions and read-only occupancy. Simulation owns the row-major cell array. During placement the initial frame reflects added penguins. Each step clones the array once, applies the demo moves to that copy in placement order, and appends a read-only view of the completed grid. Earlier frames keep their own arrays. This removes the separate writable environment interface.
 
 ## Simulation access through the engine
 
@@ -180,3 +180,7 @@ The playback footer uses the iteration border’s accent color for each key and 
 ## Restore population values in the heatmap legend
 
 Each swatch shows the inclusive penguin count range for one displayed hex. Map colors and legend labels use the same thresholds. Narrow layouts reserve extra rows so the high-density ranges stay visible alongside the low-density ranges.
+
+## Interface-only contracts
+
+Contracts contains only interfaces. The Environment and Penguin implementations live in Model alongside Simulation, which constructs them. Consumers continue to access frames and penguins through IEnvironment and IPenguin.

@@ -26,7 +26,7 @@ internal sealed class Simulation : ISimulation
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(height);
 
         _cells = new int[height, width];
-        _frames.Add(new Contracts.Environment(_cells));
+        _frames.Add(new Environment(_cells));
         Frames = _frames.AsReadOnly();
         Penguins = new ReadOnlyDictionary<int, IPenguin>(_penguins);
     }
@@ -40,7 +40,7 @@ internal sealed class Simulation : ISimulation
         {
             penguin.Move(next);
         }
-        _frames.Add(new Contracts.Environment(next));
+        _frames.Add(new Environment(next));
         _cells = next;
     }
 

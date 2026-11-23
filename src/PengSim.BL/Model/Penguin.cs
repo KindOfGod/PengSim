@@ -1,6 +1,6 @@
-using PengSim.BL.Model;
+using PengSim.BL.Contracts;
 
-namespace PengSim.BL.Contracts;
+namespace PengSim.BL.Model;
 
 /// <summary>Represents an individual penguin in a simulation.</summary>
 public sealed class Penguin : IPenguin

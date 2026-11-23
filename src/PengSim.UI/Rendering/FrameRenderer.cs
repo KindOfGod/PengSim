@@ -20,6 +20,19 @@ internal sealed class FrameRenderer(
     private const int LegendTitleWidth = 18;
     private const int LegendSwatchSpacing = 2;
 
+    private static readonly (string Key, string Action)[] Shortcuts =
+    [
+        ("WASD", "pan"),
+        ("Shift+WASD", "fine"),
+        ("+/-", "zoom"),
+        ("←/→", "step"),
+        ("Backspace", "rewind"),
+        ("0", "pause"),
+        ("1-9", "fps"),
+        ("R", "reset"),
+        ("Q", "quit"),
+    ];
+
     public string[] RenderRows(
         IEnvironment environment,
         HexFootprint footprint,
@@ -86,11 +99,23 @@ internal sealed class FrameRenderer(
             : $"Overview L{overview.Level}   ({column}, {row})";
         screen.Text(layout.Map.X, legendY + 1,
             position, IHeatmapPalette.DefaultColor, layout.Map.Width);
-        screen.Text(2, layout.Height - 2,
-            "WASD pan  Shift+WASD fine  +/- zoom  ←/→ step  Backspace rewind  0 pause  1-9 fps  R reset  Q quit",
-            IHeatmapPalette.DefaultColor, layout.Width - 4);
+        DrawShortcuts(screen, layout);
 
         return screen.ToAnsiRows(ansi);
+    }
+
+    private static void DrawShortcuts(ITerminalBuffer screen, FrameLayout layout)
+    {
+        var x = 2;
+        var y = layout.Height - 2;
+        var right = layout.Width - 2;
+        foreach (var (key, action) in Shortcuts)
+        {
+            screen.Text(x, y, key, AccentColor, right - x);
+            x += key.Length + 1;
+            screen.Text(x, y, action, IHeatmapPalette.DefaultColor, right - x);
+            x += action.Length + 2;
+        }
     }
 
     private void DrawMain(

@@ -172,3 +172,7 @@ Quitting an interactive menu or playback clears the visible display and returns 
 ## Playback rewind shortcut
 
 Backspace replaces Home for pausing playback and returning to iteration zero. The camera keeps its current zoom and position.
+
+## Playback shortcut colors
+
+The playback footer uses the iteration border’s accent color for each key and the terminal’s default foreground for its action, making the shortcuts easier to scan.

@@ -14,3 +14,11 @@
 - Keep methods focused and control flow shallow. Use guard clauses for invalid inputs and early exits. Extract a named helper when a block performs a distinct operation.
 - Use names that describe intent. Give domain thresholds and repeated settings meaningful names. Remove unused members, unused dependencies, and commented-out code.
 - Catch exceptions where the caller can recover or add useful context. Use `throw;` when rethrowing the same exception to preserve its stack trace. Use `using` or `await using` for disposable resources owned by the current scope.
+
+## ReSharper inspection guidance
+
+- When a reference can be null, reflect that in its type and handle the missing case before dereferencing it. For required inputs, validate at the boundary. [Possible null reference](https://www.jetbrains.com/help/resharper/PossibleNullReferenceException.html)
+- When processing a deferred `IEnumerable<T>`, check whether a preliminary `Any()` or `Count()` causes a second traversal. Combine the work into one pass when possible. Materialize once when callers need to revisit the same snapshot. [Possible multiple enumeration](https://www.jetbrains.com/help/resharper/PossibleMultipleEnumeration.html)
+- When a callback needs the frame or loop index from the moment it was created, capture a local copy. When it uses a disposable resource, ensure the resource stays alive until the callback completes. [Modified captures](https://www.jetbrains.com/help/resharper/AccessToModifiedClosure.html) · [Disposed captures](https://www.jetbrains.com/help/resharper/AccessToDisposedClosure.html)
+- Investigate conditions that always evaluate to the same result. Check the intended boundary cases before simplifying a branch, especially for grid bounds and playback indices.
+- Apply quick-fixes that preserve behavior and the conventions above. Keep explicit interfaces, block-bodied methods, and braced control flow when the IDE offers a shorter form.

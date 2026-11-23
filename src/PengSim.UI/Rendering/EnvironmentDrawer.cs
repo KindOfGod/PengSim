@@ -84,7 +84,7 @@ internal sealed class EnvironmentDrawer(
             while (count < MaxKeysPerFrame && Console.KeyAvailable)
             {
                 var input = Console.ReadKey(intercept: true);
-                if (input.Key == ConsoleKey.Home)
+                if (input.Key == ConsoleKey.Backspace)
                 {
                     iteration = 0;
                     speed = 0;

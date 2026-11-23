@@ -168,3 +168,7 @@ SimulationDemo coordinates the start menu, generation, and analysis. It places p
 ## Clear the terminal on quit
 
 Quitting an interactive menu or playback clears the visible display and returns the cursor to the top left for the shell prompt. TerminalPresenter performs this cleanup when its session ends.
+
+## Playback rewind shortcut
+
+Backspace replaces Home for pausing playback and returning to iteration zero. The camera keeps its current zoom and position.

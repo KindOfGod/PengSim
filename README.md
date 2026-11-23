@@ -34,7 +34,7 @@ The **main map** shows the area you are looking at. The **minimap** shows the wh
 | `+` / `-` | Zoom in / out |
 | WASD | Move the view while zoomed in |
 | Shift + WASD | Move one cell at a time |
-| Home | Pause and jump to the initial frame |
+| Backspace | Pause and jump to the initial frame |
 | Left / right arrow | Pause and step back / forward one frame |
 | `1`–`9` / `0` | Play at the selected frames per second / pause |
 | `R` | Reset view |

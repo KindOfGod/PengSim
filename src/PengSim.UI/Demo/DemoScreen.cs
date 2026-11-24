@@ -91,6 +91,35 @@ internal sealed class DemoScreen : IDemoScreen
         ReadKey(() => Draw(title, lines));
     }
 
+    public RunMode? WaitForRunMode(string name)
+    {
+        while (true)
+        {
+            var key = ReadKey(() => Draw(name,
+                ("[Enter] Run fast", Accent),
+                ("[P]     Run with progress bar", Accent),
+                ("", Normal),
+                ("[Esc] Back", Muted)));
+            if (key.Key == ConsoleKey.Enter)
+            {
+                return RunMode.Fast;
+            }
+            if (key.Key == ConsoleKey.P)
+            {
+                return RunMode.WithProgress;
+            }
+            if (key.Key == ConsoleKey.Escape)
+            {
+                return null;
+            }
+        }
+    }
+
+    public void ShowRunning()
+    {
+        Draw("Generating simulation", ("Calculating all steps…", Normal));
+    }
+
     public void ShowProgress(DemoProgress progress)
     {
         DrawProgress(progress, "Generating simulation", "Calculating steps…");

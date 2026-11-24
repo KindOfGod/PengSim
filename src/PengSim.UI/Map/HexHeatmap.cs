@@ -40,11 +40,11 @@ internal sealed class HexHeatmap : IHexHeatmap
     /// Reuse the dictionaries to avoid allocations on every iteration.
     /// Navigation and zooming only read these counts; they never rebuild them.
     /// </summary>
-    public void Rebuild(IEnvironment environment)
+    public void Rebuild(ISimulationStep simulationStep)
     {
-        if (!_footprint.Matches(environment.Map))
+        if (!_footprint.Matches(simulationStep.Map))
         {
-            throw new ArgumentException("Environment must match the hexagonal footprint.", nameof(environment));
+            throw new ArgumentException("Environment must match the hexagonal footprint.", nameof(simulationStep));
         }
 
         foreach (var level in _levels)
@@ -53,7 +53,7 @@ internal sealed class HexHeatmap : IHexHeatmap
         }
 
         _baseCells.Clear();
-        foreach (var position in environment.Positions)
+        foreach (var position in simulationStep.Positions)
         {
             var cell = _footprint.FromMap(position);
             if (!_footprint.Region.Contains(cell))

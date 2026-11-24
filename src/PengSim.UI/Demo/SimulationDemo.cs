@@ -47,7 +47,7 @@ internal sealed class SimulationDemo(
         if (!interactive)
         {
             var board = CreateFootprint(DemoParameters);
-            Generate(DemoParameters, screen: null);
+            Generate(DemoParameters, RunMode.Fast, screen: null);
             drawer.Show(engine.Iterations, board, DemoName, codec.Encode(DemoParameters));
             return;
         }
@@ -66,7 +66,12 @@ internal sealed class SimulationDemo(
                 continue;
             }
 
-            var result = Generate(parameters, screen);
+            if (screen.WaitForRunMode(name) is not { } mode)
+            {
+                continue;
+            }
+
+            var result = Generate(parameters, mode, screen);
             if (screen.WaitForAnalysis(result))
             {
                 drawer.Show(engine.Iterations, board, name, codec.Encode(parameters));
@@ -146,28 +151,46 @@ internal sealed class SimulationDemo(
         return new HexMap(parameters.SideA, parameters.SideB, parameters.SideC);
     }
 
-    private DemoProgress Generate(ISimulationParameters parameters, IDemoScreen? screen)
+    /// <summary>
+    /// Creates and calculates the simulation. <see cref="RunMode.Fast"/> runs all steps at once with
+    /// <see cref="ISimulationEngine.Exec"/>; <see cref="RunMode.WithProgress"/> runs one step at a time
+    /// and shows progress. Without a <paramref name="screen"/>, nothing is drawn.
+    /// </summary>
+    private DemoProgress Generate(ISimulationParameters parameters, RunMode mode, IDemoScreen? screen)
     {
         var totalTime = Stopwatch.StartNew();
         engine.CreateSimulation(parameters);
 
-        var totalSteps = parameters.SimulatedSteps;
         var iterationTime = Stopwatch.StartNew();
+        if (mode == RunMode.WithProgress && screen is not null)
+        {
+            StepWithProgress(parameters.SimulatedSteps, screen, totalTime, iterationTime);
+        }
+        else
+        {
+            screen?.ShowRunning();
+            engine.Exec();
+        }
+
+        iterationTime.Stop();
+        totalTime.Stop();
+        return GetProgress(parameters.SimulatedSteps, totalTime.Elapsed, iterationTime.Elapsed);
+    }
+
+    /// <summary>Runs every step separately and redraws the progress at most once per <see cref="ProgressInterval"/>.</summary>
+    private void StepWithProgress(int totalSteps, IDemoScreen screen, Stopwatch totalTime, Stopwatch iterationTime)
+    {
         var nextUpdate = TimeSpan.Zero;
         for (var step = 1; step <= totalSteps; step++)
         {
             engine.Step();
             var elapsed = iterationTime.Elapsed;
-            if (screen is not null && (elapsed >= nextUpdate || step == totalSteps))
+            if (elapsed >= nextUpdate || step == totalSteps)
             {
                 screen.ShowProgress(GetProgress(totalSteps, totalTime.Elapsed, elapsed));
                 nextUpdate = elapsed + ProgressInterval;
             }
         }
-
-        iterationTime.Stop();
-        totalTime.Stop();
-        return GetProgress(totalSteps, totalTime.Elapsed, iterationTime.Elapsed);
     }
 
     private DemoProgress GetProgress(int totalSteps, TimeSpan totalTime, TimeSpan iterationTime)

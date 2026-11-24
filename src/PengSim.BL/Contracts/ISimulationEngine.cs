@@ -10,7 +10,7 @@ public interface ISimulationEngine
     const ushort MaxCoordinate = ushort.MaxValue;
 
     /// <summary>Gets the active run's read-only position snapshots by iteration number, starting at zero. Empty before creation.</summary>
-    IReadOnlyList<IEnvironment> Iterations { get; }
+    IReadOnlyList<ISimulationStep> Iterations { get; }
 
     /// <summary>Gets the active run's penguins by occupancy ID. Empty before creation.</summary>
     IReadOnlyDictionary<ushort, IPenguin> Penguins { get; }

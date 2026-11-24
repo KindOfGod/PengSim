@@ -13,9 +13,9 @@ internal sealed class Simulation : ISimulation
     private readonly Dictionary<ushort, IPenguin> _penguins = [];
     private readonly HashSet<PenguinPosition> _occupied = [];
     private readonly List<PenguinPosition> _initialPositions = [];
-    private readonly List<IEnvironment> _frames = [];
+    private readonly List<ISimulationStep> _frames = [];
 
-    public IReadOnlyList<IEnvironment> Frames { get; }
+    public IReadOnlyList<ISimulationStep> Frames { get; }
     public IReadOnlyDictionary<ushort, IPenguin> Penguins { get; }
     public ISimulationParameters Parameters { get; }
     public string SimulationCode { get; }
@@ -39,7 +39,7 @@ internal sealed class Simulation : ISimulation
         SimulationCode = code;
         _map = new HexMap(parameters.SideA, parameters.SideB, parameters.SideC);
 
-        _frames.Add(new Environment(_map, _initialPositions.AsReadOnly()));
+        _frames.Add(new SimulationStep(_map, _initialPositions.AsReadOnly()));
         Frames = _frames.AsReadOnly();
         Penguins = new ReadOnlyDictionary<ushort, IPenguin>(_penguins);
         PlacePenguins();
@@ -63,7 +63,7 @@ internal sealed class Simulation : ISimulation
             next[index] = destination;
         }
 
-        _frames.Add(new Environment(_map, Array.AsReadOnly(next)));
+        _frames.Add(new SimulationStep(_map, Array.AsReadOnly(next)));
     }
 
     public void Exec()

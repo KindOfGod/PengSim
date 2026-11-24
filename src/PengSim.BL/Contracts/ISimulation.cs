@@ -6,7 +6,7 @@ namespace PengSim.BL.Contracts;
 internal interface ISimulation
 {
     /// <summary>Gets the position snapshots in iteration order, including initial placement at index zero.</summary>
-    IReadOnlyList<IEnvironment> Frames { get; }
+    IReadOnlyList<ISimulationStep> Frames { get; }
 
     /// <summary>Gets the penguins in this run by occupancy ID.</summary>
     IReadOnlyDictionary<ushort, IPenguin> Penguins { get; }

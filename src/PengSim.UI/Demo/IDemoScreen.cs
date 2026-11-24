@@ -16,6 +16,15 @@ internal interface IDemoScreen : IDisposable
     /// <summary>Shows an error message and waits until the user presses any key.</summary>
     void ShowError(string title, string message);
 
+    /// <summary>
+    /// Asks how to calculate the simulation named <paramref name="name"/>. Returns the
+    /// chosen mode, or null when the user presses Escape.
+    /// </summary>
+    RunMode? WaitForRunMode(string name);
+
+    /// <summary>Shows that the simulation is being calculated without progress updates.</summary>
+    void ShowRunning();
+
     /// <summary>Displays the latest generation progress and timings.</summary>
     void ShowProgress(DemoProgress progress);
 

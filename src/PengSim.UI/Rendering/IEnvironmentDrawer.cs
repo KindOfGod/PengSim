@@ -11,5 +11,5 @@ internal interface IEnvironmentDrawer
     /// The header shows <paramref name="simulationName"/> and the <paramref name="parameterCode"/>
     /// that recreates the run.
     /// </summary>
-    void Show(IReadOnlyList<IEnvironment> frames, HexFootprint footprint, string simulationName, string parameterCode);
+    void Show(IReadOnlyList<ISimulationStep> frames, HexFootprint footprint, string simulationName, string parameterCode);
 }

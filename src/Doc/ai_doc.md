@@ -254,3 +254,7 @@ The BL no longer uses offset or Cartesian coordinates. Before, positions were of
 - `SimulationParameters.Validate` builds a `HexMap`, which checks the side lengths and the new coordinate limit. `ISimulationEngine.MaxDimension` became `MaxCoordinate`.
 - `Simulation`'s two constructors now share one private constructor, so the setup is no longer duplicated.
 - `HexCell` moved to the UI (`PengSim.UI.Map`) because only drawing code still uses it. `HexFootprint` is built from an `IHexMap` and converts map positions to centered drawing coordinates. This conversion only shifts the origin and flips R. The camera's square screen grid stays in the UI as a display concern. The UI shows the camera center in map coordinates (q, r). The summary shows the map side and cell count instead of a grid size.
+
+## Fast run or progress bar
+
+After a simulation is chosen and validated, the UI asks how to calculate it: Enter runs all steps at once with `ISimulationEngine.Exec()`, and P runs them one at a time with `Step()` and the progress bar, as before. Escape goes back to the menu. The fast mode only shows a static "Calculating all steps…" panel, so it skips the progress redraws and the per-step stopwatch reads. Redirected runs always use the fast mode. The summary screen after the run shows the same timings in both modes, so the two can be compared.

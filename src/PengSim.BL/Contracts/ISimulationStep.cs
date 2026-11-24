@@ -3,7 +3,7 @@ using PengSim.BL.Model;
 namespace PengSim.BL.Contracts;
 
 /// <summary>Read-only penguin positions of one iteration on the hexagonal map.</summary>
-public interface IEnvironment
+public interface ISimulationStep
 {
     /// <summary>Gets the map these positions lie on.</summary>
     IHexMap Map { get; }

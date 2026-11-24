@@ -6,7 +6,7 @@ namespace PengSim.UI.Map;
 internal interface IHexHeatmap
 {
     /// <summary>Recounts occupied cells for the supplied iteration.</summary>
-    void Rebuild(IEnvironment environment);
+    void Rebuild(ISimulationStep simulationStep);
 
     /// <summary>Gets the population in a bucket at the given zoom level.</summary>
     int GetPopulation(int zoom, HexCell cell);

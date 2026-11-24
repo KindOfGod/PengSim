@@ -4,7 +4,7 @@ using PengSim.BL.Contracts;
 namespace PengSim.BL.Model;
 
 /// <summary>Read-only positions for one simulation iteration.</summary>
-public sealed class Environment : IEnvironment
+public sealed class SimulationStep : ISimulationStep
 {
     private readonly ReadOnlyCollection<PenguinPosition> _positions;
 
@@ -20,7 +20,7 @@ public sealed class Environment : IEnvironment
         }
     }
 
-    internal Environment(IHexMap map, ReadOnlyCollection<PenguinPosition> positions)
+    internal SimulationStep(IHexMap map, ReadOnlyCollection<PenguinPosition> positions)
     {
         Map = map;
         _positions = positions;

@@ -1,6 +1,6 @@
 # How the map is drawn
 
-The simulation stores the penguins’ offset positions in ID order. `HexFootprint` converts these positions to axial hex coordinates centered on the playable world. Both terminal panels use rectangular windows. In either panel, a hex at `(q, r)` appears at column `2*q + r` and row `r`, leaving a blank column between neighbors.
+The simulation stores the penguins’ axial map positions in ID order, with the origin at the hexagon's bottom-left corner and R growing upward. `HexFootprint` converts them to drawing coordinates centered on the world, with R growing downward. It does this by shifting the origin to the map center and flipping R. The camera still clamps to a square screen grid around the hex. That grid is a display concern only, and the simulation never sees it. Both terminal panels use rectangular windows. In either panel, a hex at `(q, r)` appears at column `2*q + r` and row `r`, leaving a blank column between neighbors.
 
 ## From a simulation to a frame
 

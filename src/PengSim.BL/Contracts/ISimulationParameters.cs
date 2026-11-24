@@ -5,9 +5,7 @@ namespace PengSim.BL.Contracts;
 /// <summary>Describes everything needed to create and run one simulation.</summary>
 /// <remarks>
 /// The map is a hexagon whose opposite sides have equal length, so three side
-/// lengths describe it fully. Lengths count the cells along a side, including both
-/// corner cells. Starting at the upper side and going clockwise, the sides are
-/// labeled as A, B, C, A, B, C.
+/// lengths describe it fully. See <see cref="IHexMap"/> for its coordinates.
 /// </remarks>
 public interface ISimulationParameters
 {
@@ -41,30 +39,9 @@ public interface ISimulationParameters
     /// <summary>Gets the air temperature in degrees Celsius.</summary>
     float TemperatureCelsius { get; }
 
-    void Validate();
-
     /// <summary>
-    /// Gets the smallest board, in offset columns and rows, that holds the hexagon
-    /// with its top side on row 0 and its leftmost cell in column 0. Returns (0, 0)
-    /// when any side is zero.
+    /// Throws an <see cref="ArgumentException"/> if the parameters cannot describe a
+    /// valid simulation, for example when the map is too large or the population does not fit.
     /// </summary>
-    /// <remarks>
-    /// Assumes pointy-topped cells with odd rows shifted right by half a cell.
-    /// </remarks>
-    (uint width, uint height) GridDimensions
-    {
-        get
-        {
-            if (SideA == 0 || SideB == 0 || SideC == 0)
-            {
-                return (0, 0);
-            }
-
-            var height = SideB + SideC - 1;
-            var spanInHalfCells = 2 * (SideA - 1) + (SideB - 1) + (SideC - 1);
-            var leftmostRowShift = (SideC - 1) & 1;
-            var width = (spanInHalfCells + leftmostRowShift) / 2 + 1;
-            return ((uint)width, (uint)height);
-        }
-    }
+    void Validate();
 }

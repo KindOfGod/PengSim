@@ -6,8 +6,8 @@ public interface ISimulationEngine
     /// <summary>Maximum number of penguins in one run.</summary>
     const ushort MaxPenguins = ushort.MaxValue;
 
-    /// <summary>Maximum width or height of a board in cells.</summary>
-    const ushort MaxDimension = ushort.MaxValue;
+    /// <summary>Largest Q or R a map cell can have, so A + C - 2 and B + C - 2 must not exceed it.</summary>
+    const ushort MaxCoordinate = ushort.MaxValue;
 
     /// <summary>Gets the active run's read-only position snapshots by iteration number, starting at zero. Empty before creation.</summary>
     IReadOnlyList<IEnvironment> Iterations { get; }

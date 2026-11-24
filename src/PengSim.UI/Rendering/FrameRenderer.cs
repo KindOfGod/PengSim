@@ -1,4 +1,3 @@
-using HexCell = PengSim.BL.Model.HexCell;
 using PengSim.UI.Map;
 
 namespace PengSim.UI.Rendering;
@@ -77,10 +76,10 @@ internal sealed class FrameRenderer(
 
         DrawLegend(screen, layout);
 
-        var (column, row) = footprint.ToOffset(camera.Center);
+        var (q, r) = footprint.ToMap(camera.Center);
         var position = camera.Level.HasValue
-            ? $"Zoom L{level}   ({column}, {row})"
-            : $"Overview L{overview.Level}   ({column}, {row})";
+            ? $"Zoom L{level}   (q {q}, r {r})"
+            : $"Overview L{overview.Level}   (q {q}, r {r})";
         screen.Text(layout.Map.X, iterationPanel.Y + iterationPanel.Height - 2,
             position, IHeatmapPalette.DefaultColor, layout.Map.Width);
         DrawShortcuts(screen, layout);
@@ -170,10 +169,10 @@ internal sealed class FrameRenderer(
     {
         screen.Box(panel.X, panel.Y, panel.Width, panel.Height,
             "Information", PanelColor);
-        var (column, row) = footprint.ToOffset(camera.Center);
+        var (q, r) = footprint.ToMap(camera.Center);
         var lines = new[]
         {
-            $"Center: ({column},{row})",
+            $"Center: q {q}, r {r}",
             camera.Level.HasValue
                 ? $"Detail L{level} / overview L{overviewLevel}"
                 : $"Full overview L{overviewLevel}",

@@ -6,4 +6,5 @@ internal readonly record struct DemoProgress(
     TimeSpan TotalTime,
     TimeSpan IterationTime,
     int Penguins,
-    ushort BoardSize);
+    ushort MapSide,
+    long MapCells);

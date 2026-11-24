@@ -1,10 +1,11 @@
-namespace PengSim.BL.Model;
+namespace PengSim.UI.Map;
 
-/// <summary>An axial coordinate in a base or aggregate hex lattice.</summary>
+/// <summary>
+/// A centered axial drawing coordinate in a base or aggregate hex lattice.
+/// (0, 0) is the map center and R grows downward on screen.
+/// </summary>
 public readonly record struct HexCell(int Q, int R)
 {
-    public static HexCell FromOffset(int column, int row) => new(column - (row >> 1), row);
-
     /// <summary>Returns the number of hex steps between two cells.</summary>
     public int DistanceTo(HexCell other)
     {

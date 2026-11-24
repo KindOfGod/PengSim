@@ -1,4 +1,3 @@
-using HexCell = PengSim.BL.Model.HexCell;
 using PengSim.BL.Contracts;
 
 namespace PengSim.UI.Map;
@@ -43,7 +42,7 @@ internal sealed class HexHeatmap : IHexHeatmap
     /// </summary>
     public void Rebuild(IEnvironment environment)
     {
-        if (environment.Width != _footprint.Size || environment.Height != _footprint.Size)
+        if (!_footprint.Matches(environment.Map))
         {
             throw new ArgumentException("Environment must match the hexagonal footprint.", nameof(environment));
         }
@@ -56,7 +55,7 @@ internal sealed class HexHeatmap : IHexHeatmap
         _baseCells.Clear();
         foreach (var position in environment.Positions)
         {
-            var cell = _footprint.ToAxial(position.X, position.Y);
+            var cell = _footprint.FromMap(position);
             if (!_footprint.Region.Contains(cell))
             {
                 continue;

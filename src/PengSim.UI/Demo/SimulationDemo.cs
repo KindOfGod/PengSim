@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using PengSim.BL.Contracts;
+using PengSim.BL.Model;
 using PengSim.BL.Parameters;
 using PengSim.UI.Map;
 using PengSim.UI.Rendering;
@@ -46,7 +47,7 @@ internal sealed class SimulationDemo(
         if (!interactive)
         {
             var board = CreateFootprint(DemoParameters);
-            Generate(DemoParameters, board, screen: null);
+            Generate(DemoParameters, screen: null);
             drawer.Show(engine.Iterations, board, DemoName, codec.Encode(DemoParameters));
             return;
         }
@@ -65,7 +66,7 @@ internal sealed class SimulationDemo(
                 continue;
             }
 
-            var result = Generate(parameters, board, screen);
+            var result = Generate(parameters, screen);
             if (screen.WaitForAnalysis(result))
             {
                 drawer.Show(engine.Iterations, board, name, codec.Encode(parameters));
@@ -134,24 +135,18 @@ internal sealed class SimulationDemo(
         }
     }
 
+    /// <summary>Builds the drawing footprint; the map checks the side lengths and the renderer requires equal sides.</summary>
     private static HexFootprint CreateFootprint(ISimulationParameters parameters)
     {
-        var (width, height) = parameters.GridDimensions;
-        if (width != height)
-        {
-            throw new ArgumentException("The renderer supports only hexes with three equal sides.", nameof(parameters));
-        }
-        if (width > ISimulationEngine.MaxDimension)
-        {
-            throw new ArgumentException(
-                $"The board would be {width:N0} cells wide, but at most {ISimulationEngine.MaxDimension:N0} are supported.",
-                nameof(parameters));
-        }
-
-        return new HexFootprint((ushort)width);
+        return new HexFootprint(CreateMap(parameters));
     }
 
-    private DemoProgress Generate(ISimulationParameters parameters, HexFootprint board, IDemoScreen? screen)
+    private static IHexMap CreateMap(ISimulationParameters parameters)
+    {
+        return new HexMap(parameters.SideA, parameters.SideB, parameters.SideC);
+    }
+
+    private DemoProgress Generate(ISimulationParameters parameters, IDemoScreen? screen)
     {
         var totalTime = Stopwatch.StartNew();
         engine.CreateSimulation(parameters);
@@ -165,19 +160,20 @@ internal sealed class SimulationDemo(
             var elapsed = iterationTime.Elapsed;
             if (screen is not null && (elapsed >= nextUpdate || step == totalSteps))
             {
-                screen.ShowProgress(GetProgress(totalSteps, board, totalTime.Elapsed, elapsed));
+                screen.ShowProgress(GetProgress(totalSteps, totalTime.Elapsed, elapsed));
                 nextUpdate = elapsed + ProgressInterval;
             }
         }
 
         iterationTime.Stop();
         totalTime.Stop();
-        return GetProgress(totalSteps, board, totalTime.Elapsed, iterationTime.Elapsed);
+        return GetProgress(totalSteps, totalTime.Elapsed, iterationTime.Elapsed);
     }
 
-    private DemoProgress GetProgress(int totalSteps, HexFootprint board, TimeSpan totalTime, TimeSpan iterationTime)
+    private DemoProgress GetProgress(int totalSteps, TimeSpan totalTime, TimeSpan iterationTime)
     {
+        var map = engine.Iterations[0].Map;
         return new DemoProgress(engine.Iterations.Count - 1, totalSteps, totalTime,
-            iterationTime, engine.Penguins.Count, board.Size);
+            iterationTime, engine.Penguins.Count, map.SideA, map.CellCount);
     }
 }

@@ -1,4 +1,3 @@
-using HexCell = PengSim.BL.Model.HexCell;
 namespace PengSim.UI.Map;
 
 /// <summary>A regular hexagonal region on one level of the lattice.</summary>

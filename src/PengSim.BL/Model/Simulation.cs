@@ -7,7 +7,9 @@ namespace PengSim.BL.Model;
 /// <summary>Owns the penguins, working occupancy, and recorded positions of one run.</summary>
 internal sealed class Simulation : ISimulation
 {
-    private readonly ISimulationParametersCodec _codec = new SimulationParametersCodec();
+    private static readonly ISimulationParametersCodec Codec = new SimulationParametersCodec();
+
+    private readonly IHexMap _map;
     private readonly Dictionary<ushort, IPenguin> _penguins = [];
     private readonly HashSet<PenguinPosition> _occupied = [];
     private readonly List<PenguinPosition> _initialPositions = [];
@@ -18,57 +20,29 @@ internal sealed class Simulation : ISimulation
     public ISimulationParameters Parameters { get; }
     public string SimulationCode { get; }
 
-    /// <summary>Creates an empty simulation from a snapshot of the given parameters.</summary>
+    /// <summary>Creates a simulation from a snapshot of the given parameters and places its penguins.</summary>
     public Simulation(ISimulationParameters parameters)
+        : this(parameters, Codec.Encode(parameters))
+    {
+    }
+
+    /// <summary>Creates a simulation from an encoded parameter code and places its penguins.</summary>
+    public Simulation(string code)
+        : this(Codec.Decode(code), code)
+    {
+    }
+
+    private Simulation(ISimulationParameters parameters, string code)
     {
         Parameters = parameters;
         Parameters.Validate();
-        SimulationCode = _codec.Encode(parameters);
-        var (width, height) = Parameters.GridDimensions;
-
-        _frames.Add(new Environment(width, height, _initialPositions.AsReadOnly()));
-        Frames = _frames.AsReadOnly();
-        Penguins = new ReadOnlyDictionary<ushort, IPenguin>(_penguins);
-        PlacePenguins();
-    }
-    
-    public Simulation(string code)
-    {
-        Parameters = _codec.Decode(code);
-        Parameters.Validate();
         SimulationCode = code;
-        var (width, height) = Parameters.GridDimensions;
+        _map = new HexMap(parameters.SideA, parameters.SideB, parameters.SideC);
 
-        _frames.Add(new Environment(width, height, _initialPositions.AsReadOnly()));
+        _frames.Add(new Environment(_map, _initialPositions.AsReadOnly()));
         Frames = _frames.AsReadOnly();
         Penguins = new ReadOnlyDictionary<ushort, IPenguin>(_penguins);
         PlacePenguins();
-    }
-
-    private ushort AddPenguin(ushort column, ushort row)
-    {
-        if (_frames.Count > 1)
-        {
-            throw new InvalidOperationException("Place penguins before the first iteration.");
-        }
-
-        if (_penguins.Count >= ISimulationEngine.MaxPenguins)
-        {
-            throw new InvalidOperationException($"A simulation supports at most {ISimulationEngine.MaxPenguins} penguins.");
-        }
-
-        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(column, _frames[0].Width);
-        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(row, _frames[0].Height);
-        var position = new PenguinPosition(column, row);
-        if (!_occupied.Add(position))
-        {
-            throw new InvalidOperationException("The cell already contains a penguin.");
-        }
-
-        var id = (ushort)(_penguins.Count + 1);
-        _penguins.Add(id, new Penguin(id));
-        _initialPositions.Add(position);
-        return id;
     }
 
     public void Step()
@@ -79,7 +53,7 @@ internal sealed class Simulation : ISimulation
         {
             var id = (ushort)(index + 1);
             var current = previous.Positions[index];
-            var destination = _penguins[id].Move(current, previous.Width, previous.Height, _occupied);
+            var destination = _penguins[id].Move(current, _map, _occupied);
             if (current != destination)
             {
                 _occupied.Remove(current);
@@ -89,7 +63,7 @@ internal sealed class Simulation : ISimulation
             next[index] = destination;
         }
 
-        _frames.Add(new Environment(previous.Width, previous.Height, Array.AsReadOnly(next)));
+        _frames.Add(new Environment(_map, Array.AsReadOnly(next)));
     }
 
     public void Exec()
@@ -101,8 +75,8 @@ internal sealed class Simulation : ISimulation
     }
 
     /// <summary>
-    /// Brute-force placement: draws seeded random cells on the board and keeps those
-    /// inside the hexagon that are still empty, until the population is placed.
+    /// Brute-force placement: draws seeded random cells on the map and keeps those
+    /// that are still empty, until the population is placed.
     /// </summary>
     private void PlacePenguins()
     {
@@ -112,37 +86,40 @@ internal sealed class Simulation : ISimulation
         }
 
         var random = new Random(Parameters.PenguinDistributionSeed);
-        var width = (int)_frames[0].Width;
-        var height = (int)_frames[0].Height;
         while (_penguins.Count < Parameters.PenguinPopulation)
         {
-            var column = (ushort)random.Next(width);
-            var row = (ushort)random.Next(height);
-            if (IsInsideHexagon(column, row) && !_occupied.Contains(new PenguinPosition(column, row)))
+            var position = _map.GetRandomPosition(random);
+            if (!_occupied.Contains(position))
             {
-                AddPenguin(column, row);
+                AddPenguin(position);
             }
         }
     }
 
-    /// <summary>
-    /// Checks a board cell against the hexagon laid out by
-    /// <see cref="ISimulationParameters.GridDimensions"/>. Each pair of opposite sides
-    /// bounds one axial coordinate: r for A, q for B, and q + r for C.
-    /// </summary>
-    private bool IsInsideHexagon(ushort column, ushort row)
+    private void AddPenguin(PenguinPosition position)
     {
-        var cell = HexCell.FromOffset(column, row);
-        var sideA = Parameters.SideA;
-        var sideB = Parameters.SideB;
-        var sideC = Parameters.SideC;
+        if (_frames.Count > 1)
+        {
+            throw new InvalidOperationException("Place penguins before the first iteration.");
+        }
 
-        // Axial q of the top-left corner, given the leftmost cell sits in column 0 on row C - 1.
-        var topLeftQ = (sideC - 1) - ((sideC - 1) >> 1);
+        if (_penguins.Count >= ISimulationEngine.MaxPenguins)
+        {
+            throw new InvalidOperationException($"A simulation supports at most {ISimulationEngine.MaxPenguins} penguins.");
+        }
 
-        var withinRows = cell.R >= 0 && cell.R <= sideB + sideC - 2;
-        var withinLeftAndRight = cell.Q >= topLeftQ - (sideC - 1) && cell.Q <= topLeftQ + (sideA - 1);
-        var withinDiagonals = cell.Q + cell.R >= topLeftQ && cell.Q + cell.R <= topLeftQ + (sideA - 1) + (sideB - 1);
-        return withinRows && withinLeftAndRight && withinDiagonals;
+        if (!_map.Contains(position.Q, position.R))
+        {
+            throw new ArgumentOutOfRangeException(nameof(position), position, "The cell is not on the map.");
+        }
+
+        if (!_occupied.Add(position))
+        {
+            throw new InvalidOperationException("The cell already contains a penguin.");
+        }
+
+        var id = (ushort)(_penguins.Count + 1);
+        _penguins.Add(id, new Penguin(id));
+        _initialPositions.Add(position);
     }
 }

@@ -223,7 +223,8 @@ The demo now builds an `ISimulationParameters` instance and passes it to `Create
 
 The main menu now offers [1] Simulation from parameters, [2] Simulation from code, and [3] Demo simulation. All three produce an `ISimulationParameters` and use the same steps after that: validate, build the footprint, generate, show the summary, and analyze. The step count now comes from `SimulatedSteps` instead of a demo constant.
 
-- `SimulationParameterForm` asks for one field per prompt, pre-filled with the demo values, and repeats a prompt until the input parses. It does not ask for the placement seed: the UI sets a random seed when it builds the parameters, because users want new layouts rather than to choose a seed. The code shown in the analysis view keeps the seed, so a run can still be reproduced. It asks for a single side length because the renderer only draws regular hexes. It does not ask for the distribution because only Uniform exists.
+- `SimulationParameterForm` asks for one field per prompt, pre-filled with the demo values, and repeats a prompt until the input parses. It does not ask for the placement seed: the UI sets a random seed when it builds the parameters, because users want new layouts rather than to choose a seed. The code shown in the analysis view keeps the seed, so a run can still be reproduced. It does not ask for the distribution because only Uniform exists.
+- The form now asks for all three side lengths (eight fields in total), and every prompt shows its allowed range. A prompt repeats until the value is within that range, so mistakes are caught at the field instead of after the whole form. Side C allows at most 65537 − max(A, B), which keeps A + C − 2 and B + C − 2 within `ushort`. The population allows at most the map's cell count, capped at 65535. Prefilled defaults are clamped to these limits. Wind speed must be 0 or more, and all decimals must be finite. Unequal sides pass the form but are still rejected by `HexFootprint`, because the renderer only draws regular hexes.
 - The code option decodes through `ISimulationParametersCodec`, which is now registered in the UI container. An invalid code keeps the prompt open and shows an error.
 - `Validate()` failures are shown on an error screen, followed by a return to the menu. So are boards wider than `MaxDimension`, which would otherwise wrap when converted to `ushort`, and hexes with unequal sides.
 - `DemoScreen` gained a line-input prompt and an error screen. Its key loop is shared, so every screen redraws on resize. Escape in any prompt returns to the menu.
@@ -234,3 +235,22 @@ The main menu now offers [1] Simulation from parameters, [2] Simulation from cod
 The analysis header now shows the run's parameter code next to its name: `Name: … Code: …`. Pasting it into Simulation from code recreates the same run. This works because placement is seeded and the codec stores floats by their raw bits. A temporary engine test confirmed that a decoded code gives the same frame zero and the same later frames. The header row was chosen because it has almost the full terminal width, while codes are 30–60 characters long and would be clipped in the Information panel. `IEnvironmentDrawer.Show` and `IFrameRenderer.RenderRows` take the code as an extra string argument. The UI encodes the code with `ISimulationParametersCodec` before opening the view.
 
 The README now documents the parameter model, the `GridDimensions` formula, the code format, engine-side seeded placement, the 65,535 limits, and `null` for empty cells. Before, it still described `AddPenguin`, a 65,000 limit, and zero as the empty-cell value.
+
+## Hex coordinates throughout the BL
+
+The BL no longer uses offset or Cartesian coordinates. Before, positions were offset column/row pairs on the rectangle around the hexagon. Each penguin move converted them to axial and back, and the inside check, `GridDimensions`, and row-parity rules all existed only because of that rectangle.
+
+- `PenguinPosition` is now `(ushort Q, ushort R)` and still takes 4 bytes. The origin is the hexagon's bottom-left corner. R counts rows upward, and Q counts the top-left-to-bottom-right diagonals to the right. This origin keeps every coordinate non-negative, so storage stays `ushort` without sign handling. Neighbors are (±1, 0), (0, ±1), and ±(1, 1).
+- The new `IHexMap` / `HexMap` owns all geometry:
+  - side lengths, `MaxQ` (A + C − 2) and `MaxR` (B + C − 2)
+  - `CellCount`, which uses `long` because the old `int` formula overflowed for large sides
+  - `Center`: the hexagon is point-symmetric, so its center is (MaxQ / 2, MaxR / 2), rounded down
+  - `Contains`: three range checks, one for each pair of opposite sides
+  - `Distance`: max(|Δq|, |Δr|, |Δq − Δr|)
+  - `SquaredEuclideanDistance`: Δq² − ΔqΔr + Δr², which the movement rule uses to break ties
+  - `GetNeighbors` and seeded `GetRandomPosition`
+- `HexMapTests` check all of this against brute force for every side combination from 1 to 6. That covers the cell count, side lengths, corners, the center, and breadth-first distances.
+- `IEnvironment` exposes `Map` instead of `Width`/`Height`. Its indexer takes a `PenguinPosition`. `IPenguin.Move` receives the map instead of a width and height. `ISimulationParameters.GridDimensions` has been removed.
+- `SimulationParameters.Validate` builds a `HexMap`, which checks the side lengths and the new coordinate limit. `ISimulationEngine.MaxDimension` became `MaxCoordinate`.
+- `Simulation`'s two constructors now share one private constructor, so the setup is no longer duplicated.
+- `HexCell` moved to the UI (`PengSim.UI.Map`) because only drawing code still uses it. `HexFootprint` is built from an `IHexMap` and converts map positions to centered drawing coordinates. This conversion only shifts the origin and flips R. The camera's square screen grid stays in the UI as a display concern. The UI shows the camera center in map coordinates (q, r). The summary shows the map side and cell count instead of a grid size.

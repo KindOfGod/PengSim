@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using PengSim.BL.Contracts;
 using PengSim.BL.Model;
+using PengSim.BL.Parameters;
 
 namespace PengSim.BL;
 
@@ -16,24 +17,32 @@ public sealed class SimulationEngine : ISimulationEngine
     public IReadOnlyDictionary<ushort, IPenguin> Penguins =>
         _simulation?.Penguins ?? ReadOnlyDictionary<ushort, IPenguin>.Empty;
 
-    private ISimulation ActiveSimulation =>
-        _simulation ?? throw new InvalidOperationException("Create a simulation before placing penguins or stepping.");
-
     /// <inheritdoc />
-    public void CreateSimulation(ushort width, ushort height)
+    public ISimulationEngine CreateSimulation(ISimulationParameters parameters)
     {
-        _simulation = new Simulation(width, height);
+        _simulation = new Simulation(parameters);
+        return this;
     }
-
+    
     /// <inheritdoc />
-    public ushort AddPenguin(ushort column, ushort row)
+    public ISimulationEngine CreateSimulation(string code)
     {
-        return ActiveSimulation.AddPenguin(column, row);
+        _simulation = new Simulation(code);
+        return this;
     }
 
     /// <inheritdoc />
     public void Step()
     {
-        ActiveSimulation.Step();
+        if (_simulation is null) throw new InvalidOperationException("Simulation was not created yet.");
+        
+        _simulation.Step();
+    }
+
+    public void Exec()
+    {
+        if (_simulation is null) throw new InvalidOperationException("Simulation was not created yet.");
+
+        _simulation?.Exec();
     }
 }

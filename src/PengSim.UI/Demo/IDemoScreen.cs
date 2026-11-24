@@ -1,10 +1,20 @@
 namespace PengSim.UI.Demo;
 
-/// <summary>Displays the demo menus and generation progress.</summary>
+/// <summary>Displays the menus, text prompts, and generation progress.</summary>
 internal interface IDemoScreen : IDisposable
 {
-    /// <summary>Shows the main menu and returns true when the user chooses Run demo.</summary>
-    bool WaitForDemoStart();
+    /// <summary>Shows the main menu and returns the chosen entry, or null when the user quits.</summary>
+    MenuChoice? WaitForMenuChoice();
+
+    /// <summary>
+    /// Asks for one line of text, starting with <paramref name="initialText"/>. Shows
+    /// <paramref name="error"/> below the input when it is set. Returns the confirmed
+    /// text, or null when the user presses Escape.
+    /// </summary>
+    string? ReadLine(string title, string label, string initialText, string? error);
+
+    /// <summary>Shows an error message and waits until the user presses any key.</summary>
+    void ShowError(string title, string message);
 
     /// <summary>Displays the latest generation progress and timings.</summary>
     void ShowProgress(DemoProgress progress);

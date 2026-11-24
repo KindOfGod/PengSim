@@ -7,23 +7,20 @@ namespace PengSim.BL.Model;
 public sealed class Environment : IEnvironment
 {
     private readonly ReadOnlyCollection<PenguinPosition> _positions;
-
-    public ushort Width { get; }
-    public ushort Height { get; }
+    public uint Width { get; }
+    public uint Height { get; }
     public IReadOnlyList<PenguinPosition> Positions => _positions;
 
-    public ushort this[ushort column, ushort row]
+    public ushort? this[ushort column, ushort row]
     {
         get
         {
-            ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(column, Width);
-            ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(row, Height);
             var index = _positions.IndexOf(new PenguinPosition(column, row));
-            return (ushort)(index + 1);
+            return index < 0 ? null : (ushort)(index + 1);
         }
     }
 
-    internal Environment(ushort width, ushort height, ReadOnlyCollection<PenguinPosition> positions)
+    internal Environment(uint width, uint height, ReadOnlyCollection<PenguinPosition> positions)
     {
         Width = width;
         Height = height;

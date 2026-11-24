@@ -1,78 +1,183 @@
 using System.Diagnostics;
 using PengSim.BL.Contracts;
-using PengSim.BL.Model;
+using PengSim.BL.Parameters;
 using PengSim.UI.Map;
 using PengSim.UI.Rendering;
 
 namespace PengSim.UI.Demo;
 
+/// <summary>
+/// Lets the user pick a simulation from the main menu, generates it, and opens the analysis view.
+/// </summary>
 internal sealed class SimulationDemo(
-    ISimulationEngine engine, IEnvironmentDrawer drawer, Func<IDemoScreen> createScreen) : ISimulationDemo
+    ISimulationEngine engine,
+    IEnvironmentDrawer drawer,
+    ISimulationParameterForm parameterForm,
+    ISimulationParametersCodec codec,
+    Func<IDemoScreen> createScreen) : ISimulationDemo
 {
-    private const int PenguinCount = 500;
-    private const int IterationCount = 1_000;
-    private static readonly HexFootprint Board = new(size: 250);
+    // The renderer draws regular hexes, so the demo uses equal sides.
+    private const ushort HexSideLength = 125;
+    private const ushort PenguinCount = 500;
+    private const ushort IterationCount = 1_000;
+    private const float DemoTemperatureCelsius = -20f;
+    private const string DemoName = "Penguin demo";
+    private const string ParametersName = "Custom simulation";
+    private const string CodeName = "Simulation from code";
     private static readonly TimeSpan ProgressInterval = TimeSpan.FromMilliseconds(100);
+
+    private static readonly ISimulationParameters DemoParameters = new SimulationParameters
+    {
+        SideA = HexSideLength,
+        SideB = HexSideLength,
+        SideC = HexSideLength,
+        PenguinPopulation = PenguinCount,
+        PenguinDistribution = PenguinDistribution.Uniform,
+        PenguinDistributionSeed = (ushort)Random.Shared.Next(ushort.MaxValue + 1),
+        SimulatedSteps = IterationCount,
+        WindDirectionDegrees = 0f,
+        WindSpeedMetersPerSecond = 0f,
+        TemperatureCelsius = DemoTemperatureCelsius,
+    };
 
     public void Run()
     {
         var interactive = !Console.IsInputRedirected && !Console.IsOutputRedirected;
-        using var screen = interactive ? createScreen() : null;
-        if (screen is not null && !screen.WaitForDemoStart())
+        if (!interactive)
         {
+            var board = CreateFootprint(DemoParameters);
+            Generate(DemoParameters, board, screen: null);
+            drawer.Show(engine.Iterations, board, DemoName, codec.Encode(DemoParameters));
             return;
         }
 
-        var result = GenerateDemo(screen);
-        if (screen is not null && !screen.WaitForAnalysis(result))
+        using var screen = createScreen();
+        while (screen.WaitForMenuChoice() is { } choice)
         {
+            if (ChooseParameters(choice, screen) is not { } selection)
+            {
+                continue;
+            }
+
+            var (parameters, name) = selection;
+            if (TryCreateFootprint(parameters, screen) is not { } board)
+            {
+                continue;
+            }
+
+            var result = Generate(parameters, board, screen);
+            if (screen.WaitForAnalysis(result))
+            {
+                drawer.Show(engine.Iterations, board, name, codec.Encode(parameters));
+            }
             return;
         }
-
-        drawer.Show(engine.Iterations, Board, "Penguin demo");
     }
 
-    private DemoProgress GenerateDemo(IDemoScreen? screen)
+    /// <summary>Returns the parameters and display name for a menu entry, or null to go back to the menu.</summary>
+    private (ISimulationParameters Parameters, string Name)? ChooseParameters(MenuChoice choice, IDemoScreen screen)
+    {
+        switch (choice)
+        {
+            case MenuChoice.FromParameters:
+                return parameterForm.Read(screen, DemoParameters) is { } parameters
+                    ? (parameters, ParametersName)
+                    : null;
+            case MenuChoice.FromCode:
+                return ReadCode(screen) is { } decoded
+                    ? (decoded, CodeName)
+                    : null;
+            case MenuChoice.Demo:
+                return (DemoParameters, DemoName);
+            default:
+                throw new ArgumentOutOfRangeException(nameof(choice), choice, "Unknown menu entry.");
+        }
+    }
+
+    /// <summary>Asks for a code until it decodes into valid parameters, or returns null on Escape.</summary>
+    private ISimulationParameters? ReadCode(IDemoScreen screen)
+    {
+        var text = "";
+        string? error = null;
+        while (true)
+        {
+            var input = screen.ReadLine(CodeName, "Paste the simulation code", text, error);
+            if (input is null)
+            {
+                return null;
+            }
+
+            try
+            {
+                return codec.Decode(input.Trim());
+            }
+            catch (Exception exception) when (exception is ArgumentException or FormatException or OverflowException)
+            {
+                text = input;
+                error = "Invalid code or invalid parameters.";
+            }
+        }
+    }
+
+    /// <summary>Validates the parameters for the engine and renderer, or shows why they cannot run.</summary>
+    private static HexFootprint? TryCreateFootprint(ISimulationParameters parameters, IDemoScreen screen)
+    {
+        try
+        {
+            parameters.Validate();
+            return CreateFootprint(parameters);
+        }
+        catch (ArgumentException exception)
+        {
+            screen.ShowError("Invalid parameters", exception.Message);
+            return null;
+        }
+    }
+
+    private static HexFootprint CreateFootprint(ISimulationParameters parameters)
+    {
+        var (width, height) = parameters.GridDimensions;
+        if (width != height)
+        {
+            throw new ArgumentException("The renderer supports only hexes with three equal sides.", nameof(parameters));
+        }
+        if (width > ISimulationEngine.MaxDimension)
+        {
+            throw new ArgumentException(
+                $"The board would be {width:N0} cells wide, but at most {ISimulationEngine.MaxDimension:N0} are supported.",
+                nameof(parameters));
+        }
+
+        return new HexFootprint((ushort)width);
+    }
+
+    private DemoProgress Generate(ISimulationParameters parameters, HexFootprint board, IDemoScreen? screen)
     {
         var totalTime = Stopwatch.StartNew();
-        engine.CreateSimulation(Board.Size, Board.Size);
-        PlacePenguins();
+        engine.CreateSimulation(parameters);
 
+        var totalSteps = parameters.SimulatedSteps;
         var iterationTime = Stopwatch.StartNew();
         var nextUpdate = TimeSpan.Zero;
-        for (var step = 1; step <= IterationCount; step++)
+        for (var step = 1; step <= totalSteps; step++)
         {
             engine.Step();
             var elapsed = iterationTime.Elapsed;
-            if (screen is not null && (elapsed >= nextUpdate || step == IterationCount))
+            if (screen is not null && (elapsed >= nextUpdate || step == totalSteps))
             {
-                screen.ShowProgress(GetProgress(totalTime.Elapsed, elapsed));
+                screen.ShowProgress(GetProgress(totalSteps, board, totalTime.Elapsed, elapsed));
                 nextUpdate = elapsed + ProgressInterval;
             }
         }
 
         iterationTime.Stop();
         totalTime.Stop();
-        return GetProgress(totalTime.Elapsed, iterationTime.Elapsed);
+        return GetProgress(totalSteps, board, totalTime.Elapsed, iterationTime.Elapsed);
     }
 
-    private void PlacePenguins()
+    private DemoProgress GetProgress(int totalSteps, HexFootprint board, TimeSpan totalTime, TimeSpan iterationTime)
     {
-        var placed = new HashSet<PenguinPosition>(PenguinCount);
-        while (placed.Count < PenguinCount)
-        {
-            var x = (ushort)Random.Shared.Next(Board.Size);
-            var y = (ushort)Random.Shared.Next(Board.Size);
-            if (Board.Contains(x, y) && placed.Add(new PenguinPosition(x, y)))
-            {
-                engine.AddPenguin(x, y);
-            }
-        }
-    }
-
-    private DemoProgress GetProgress(TimeSpan totalTime, TimeSpan iterationTime)
-    {
-        return new DemoProgress(engine.Iterations.Count - 1, IterationCount, totalTime,
-            iterationTime, engine.Penguins.Count, Board.Size);
+        return new DemoProgress(engine.Iterations.Count - 1, totalSteps, totalTime,
+            iterationTime, engine.Penguins.Count, board.Size);
     }
 }

@@ -15,6 +15,7 @@ internal sealed class FrameRenderer(
     private const uint AccentColor = IHeatmapPalette.Accent;
     private const uint SelectionColor = 0xffd75f;
     private const uint CenterColor = 0xfff0a0;
+    private const string HeaderGap = "    ";
 
     private static readonly (string Key, string Action)[] Shortcuts =
     [
@@ -34,6 +35,7 @@ internal sealed class FrameRenderer(
         IHexHeatmap heatmap,
         IMapCamera camera,
         string simulationName,
+        string parameterCode,
         int iteration,
         int lastIteration,
         int speed,
@@ -47,7 +49,7 @@ internal sealed class FrameRenderer(
 
         var screen = createBuffer(layout.Width, layout.Height);
         screen.Box(0, 0, layout.Width, layout.Height, "Penguin Simulation", OuterColor);
-        screen.Text(2, 1, "Name: " + simulationName,
+        screen.Text(2, 1, $"Name: {simulationName}{HeaderGap}Code: {parameterCode}",
             IHeatmapPalette.DefaultColor, layout.Width - 4);
         screen.Text(2, 2, speed == 0 ? "Paused" : $"Playing at {speed} fps",
             IHeatmapPalette.DefaultColor, layout.Width - 4);

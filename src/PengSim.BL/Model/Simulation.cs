@@ -1,11 +1,13 @@
 using System.Collections.ObjectModel;
 using PengSim.BL.Contracts;
+using PengSim.BL.Parameters;
 
 namespace PengSim.BL.Model;
 
 /// <summary>Owns the penguins, working occupancy, and recorded positions of one run.</summary>
 internal sealed class Simulation : ISimulation
 {
+    private readonly ISimulationParametersCodec _codec = new SimulationParametersCodec();
     private readonly Dictionary<ushort, IPenguin> _penguins = [];
     private readonly HashSet<PenguinPosition> _occupied = [];
     private readonly List<PenguinPosition> _initialPositions = [];
@@ -13,20 +15,37 @@ internal sealed class Simulation : ISimulation
 
     public IReadOnlyList<IEnvironment> Frames { get; }
     public IReadOnlyDictionary<ushort, IPenguin> Penguins { get; }
+    public ISimulationParameters Parameters { get; }
+    public string SimulationCode { get; }
 
-    public Simulation(ushort width, ushort height)
+    /// <summary>Creates an empty simulation from a snapshot of the given parameters.</summary>
+    public Simulation(ISimulationParameters parameters)
     {
-        ArgumentOutOfRangeException.ThrowIfZero(width);
-        ArgumentOutOfRangeException.ThrowIfGreaterThan(width, ISimulationEngine.MaxDimension);
-        ArgumentOutOfRangeException.ThrowIfZero(height);
-        ArgumentOutOfRangeException.ThrowIfGreaterThan(height, ISimulationEngine.MaxDimension);
+        Parameters = parameters;
+        Parameters.Validate();
+        SimulationCode = _codec.Encode(parameters);
+        var (width, height) = Parameters.GridDimensions;
 
         _frames.Add(new Environment(width, height, _initialPositions.AsReadOnly()));
         Frames = _frames.AsReadOnly();
         Penguins = new ReadOnlyDictionary<ushort, IPenguin>(_penguins);
+        PlacePenguins();
+    }
+    
+    public Simulation(string code)
+    {
+        Parameters = _codec.Decode(code);
+        Parameters.Validate();
+        SimulationCode = code;
+        var (width, height) = Parameters.GridDimensions;
+
+        _frames.Add(new Environment(width, height, _initialPositions.AsReadOnly()));
+        Frames = _frames.AsReadOnly();
+        Penguins = new ReadOnlyDictionary<ushort, IPenguin>(_penguins);
+        PlacePenguins();
     }
 
-    public ushort AddPenguin(ushort column, ushort row)
+    private ushort AddPenguin(ushort column, ushort row)
     {
         if (_frames.Count > 1)
         {
@@ -71,5 +90,59 @@ internal sealed class Simulation : ISimulation
         }
 
         _frames.Add(new Environment(previous.Width, previous.Height, Array.AsReadOnly(next)));
+    }
+
+    public void Exec()
+    {
+        while (_frames.Count <= Parameters.SimulatedSteps)
+        {
+            Step();
+        }
+    }
+
+    /// <summary>
+    /// Brute-force placement: draws seeded random cells on the board and keeps those
+    /// inside the hexagon that are still empty, until the population is placed.
+    /// </summary>
+    private void PlacePenguins()
+    {
+        if (Parameters.PenguinDistribution != PenguinDistribution.Uniform)
+        {
+            throw new NotSupportedException($"Distribution {Parameters.PenguinDistribution} is not implemented.");
+        }
+
+        var random = new Random(Parameters.PenguinDistributionSeed);
+        var width = (int)_frames[0].Width;
+        var height = (int)_frames[0].Height;
+        while (_penguins.Count < Parameters.PenguinPopulation)
+        {
+            var column = (ushort)random.Next(width);
+            var row = (ushort)random.Next(height);
+            if (IsInsideHexagon(column, row) && !_occupied.Contains(new PenguinPosition(column, row)))
+            {
+                AddPenguin(column, row);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Checks a board cell against the hexagon laid out by
+    /// <see cref="ISimulationParameters.GridDimensions"/>. Each pair of opposite sides
+    /// bounds one axial coordinate: r for A, q for B, and q + r for C.
+    /// </summary>
+    private bool IsInsideHexagon(ushort column, ushort row)
+    {
+        var cell = HexCell.FromOffset(column, row);
+        var sideA = Parameters.SideA;
+        var sideB = Parameters.SideB;
+        var sideC = Parameters.SideC;
+
+        // Axial q of the top-left corner, given the leftmost cell sits in column 0 on row C - 1.
+        var topLeftQ = (sideC - 1) - ((sideC - 1) >> 1);
+
+        var withinRows = cell.R >= 0 && cell.R <= sideB + sideC - 2;
+        var withinLeftAndRight = cell.Q >= topLeftQ - (sideC - 1) && cell.Q <= topLeftQ + (sideA - 1);
+        var withinDiagonals = cell.Q + cell.R >= topLeftQ && cell.Q + cell.R <= topLeftQ + (sideA - 1) + (sideB - 1);
+        return withinRows && withinLeftAndRight && withinDiagonals;
     }
 }

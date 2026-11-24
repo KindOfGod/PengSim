@@ -214,3 +214,23 @@ The demo now places 1,000 penguins. At four bytes per position, the initial fram
 ## 250 × 250 demo and playback controls
 
 The demo places 500 penguins on a 250 × 250 grid and records 1,000 steps. The 1,001 frames contain 2,002,000 bytes of coordinates. The temporary M shortcut has been removed. Keys 1–9 select playback speed and 0 pauses.
+
+## Parameter-based demo setup
+
+The demo now builds an `ISimulationParameters` instance and passes it to `CreateSimulation`, so the engine handles placement instead of the UI. The parameters use three equal sides of 125 cells because the renderer and heatmap only draw regular hexes. `GridDimensions` gives a 249 × 249 board. The UI's `HexFootprint` centers the same radius-124 hex on that board, so both layers use the same cells. If the sides differ, the UI throws at startup instead of drawing the wrong shape.
+
+## Start menu with three simulation sources
+
+The main menu now offers [1] Simulation from parameters, [2] Simulation from code, and [3] Demo simulation. All three produce an `ISimulationParameters` and use the same steps after that: validate, build the footprint, generate, show the summary, and analyze. The step count now comes from `SimulatedSteps` instead of a demo constant.
+
+- `SimulationParameterForm` asks for one field per prompt, pre-filled with the demo values, and repeats a prompt until the input parses. It asks for a single side length because the renderer only draws regular hexes. It does not ask for the distribution because only Uniform exists.
+- The code option decodes through `ISimulationParametersCodec`, which is now registered in the UI container. An invalid code keeps the prompt open and shows an error.
+- `Validate()` failures are shown on an error screen, followed by a return to the menu. So are boards wider than `MaxDimension`, which would otherwise wrap when converted to `ushort`, and hexes with unequal sides.
+- `DemoScreen` gained a line-input prompt and an error screen. Its key loop is shared, so every screen redraws on resize. Escape in any prompt returns to the menu.
+- Redirected runs skip the menu and render the demo overview as before.
+
+## Parameter code in the analysis view
+
+The analysis header now shows the run's parameter code next to its name: `Name: … Code: …`. Pasting it into Simulation from code recreates the same run. This works because placement is seeded and the codec stores floats by their raw bits. A temporary engine test confirmed that a decoded code gives the same frame zero and the same later frames. The header row was chosen because it has almost the full terminal width, while codes are 30–60 characters long and would be clipped in the Information panel. `IEnvironmentDrawer.Show` and `IFrameRenderer.RenderRows` take the code as an extra string argument. The UI encodes the code with `ISimulationParametersCodec` before opening the view.
+
+The README now documents the parameter model, the `GridDimensions` formula, the code format, engine-side seeded placement, the 65,535 limits, and `null` for empty cells. Before, it still described `AddPenguin`, a 65,000 limit, and zero as the empty-cell value.

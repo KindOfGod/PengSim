@@ -6,6 +6,6 @@ internal enum RunMode
     /// <summary>Calculate all steps in one call without updating the screen.</summary>
     Fast,
 
-    /// <summary>Calculate one step at a time and show a progress bar.</summary>
+    /// <summary>Calculate one step at a time to display information between the steps.</summary>
     WithProgress,
 }

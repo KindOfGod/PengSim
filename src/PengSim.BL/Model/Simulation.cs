@@ -10,9 +10,6 @@ internal sealed class Simulation : ISimulation
     /// <summary>Decodes parameter codes for <see cref="Simulation(string)"/>.</summary>
     private static readonly ISimulationParametersCodec Codec = new SimulationParametersCodec();
 
-    /// <summary>The validated parameters this run was created from.</summary>
-    private readonly ISimulationParameters _parameters;
-
     /// <summary>The map all penguins move on.</summary>
     private readonly IHexMap _map;
 
@@ -32,6 +29,9 @@ internal sealed class Simulation : ISimulation
     public IReadOnlyList<ISimulationStep> Frames { get; }
 
     /// <inheritdoc />
+    public ISimulationParameters Parameters { get; }
+
+    /// <inheritdoc />
     public IReadOnlyDictionary<ushort, IPenguin> Penguins { get; }
 
     /// <summary>
@@ -41,7 +41,7 @@ internal sealed class Simulation : ISimulation
     public Simulation(ISimulationParameters parameters)
     {
         parameters.Validate();
-        _parameters = parameters;
+        Parameters = parameters;
         _map = new HexMap(parameters.SideA, parameters.SideB, parameters.SideC);
 
         _frames.Add(new SimulationStep(_map, _initialPositions.AsReadOnly()));
@@ -82,7 +82,7 @@ internal sealed class Simulation : ISimulation
     public void Exec()
     {
         var recordedSteps = _frames.Count - 1;
-        while (recordedSteps < _parameters.SimulatedSteps)
+        while (recordedSteps < Parameters.SimulatedSteps)
         {
             Step();
             recordedSteps++;
@@ -95,13 +95,13 @@ internal sealed class Simulation : ISimulation
     /// </summary>
     private void PlacePenguins()
     {
-        if (_parameters.PenguinDistribution != PenguinDistribution.Uniform)
+        if (Parameters.PenguinDistribution != PenguinDistribution.Uniform)
         {
-            throw new NotSupportedException($"Distribution {_parameters.PenguinDistribution} is not implemented.");
+            throw new NotSupportedException($"Distribution {Parameters.PenguinDistribution} is not implemented.");
         }
 
-        var random = new Random(_parameters.PenguinDistributionSeed);
-        while (_penguins.Count < _parameters.PenguinPopulation)
+        var random = new Random(Parameters.PenguinDistributionSeed);
+        while (_penguins.Count < Parameters.PenguinPopulation)
         {
             var position = _map.GetRandomPosition(random);
             if (!_occupiedCells.Contains(position))

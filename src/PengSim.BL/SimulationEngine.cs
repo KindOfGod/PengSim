@@ -14,6 +14,9 @@ public sealed class SimulationEngine : ISimulationEngine
     public IReadOnlyList<ISimulationStep> Iterations => _simulation?.Frames ?? Array.Empty<ISimulationStep>();
 
     /// <inheritdoc />
+    public ISimulationParameters? Parameters => _simulation?.Parameters;
+
+    /// <inheritdoc />
     public IReadOnlyDictionary<ushort, IPenguin> Penguins =>
         _simulation?.Penguins ?? ReadOnlyDictionary<ushort, IPenguin>.Empty;
 

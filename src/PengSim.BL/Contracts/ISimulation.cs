@@ -6,6 +6,9 @@ internal interface ISimulation
     /// <summary>Gets the position snapshots in iteration order, including initial placement at index zero.</summary>
     IReadOnlyList<ISimulationStep> Frames { get; }
 
+    /// <summary>Gets the validated parameters this run was created from.</summary>
+    ISimulationParameters Parameters { get; }
+
     /// <summary>Gets the penguins in this run by ID, starting at 1.</summary>
     IReadOnlyDictionary<ushort, IPenguin> Penguins { get; }
 

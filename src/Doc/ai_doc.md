@@ -274,3 +274,19 @@ Small code changes made along the way:
 - `Decode` now requires exactly ten segments instead of at least ten, so codes with trailing extra segments are rejected.
 - `Simulation` dropped the unused `SimulationCode` property and the private constructor that existed only for it. `Parameters` is now a private field.
 - `SimulationEngine.Step` and `Exec` share a guard helper that uses braces, as the repository conventions require.
+
+## Clearer code errors, printed code, and parameter tests
+
+- The code prompt now shows the exception message from `Decode` instead of a generic text, such as the expected segment count or which value is out of range. `DemoScreen` wraps long errors over several lines so they are not cut off at the panel edge.
+- After the app exits, the code of the generated run is printed to the normal terminal, so it can be copied after the alternate screen closes. The analysis header still shows it as well. Nothing is printed when the user quits from the menu without generating a run.
+- `ISimulationEngine.CreateSimulation(string code)` stays, even though the UI decodes codes itself. Future modules will connect to the engine and start runs from codes.
+- New tests cover the codec (wrong segment count, empty code, non-hex segments, values that overflow a `ushort`, NaN floats, a side of 0, an unknown distribution, normalizing a negative wind direction, and round trips of the demo and boundary parameters) and `SimulationParameters.Validate` (each rule, plus a population that fills every cell).
+- The README now describes the three-side form, the range hints, the Enter/P run choice, and the printed code.
+
+## The UI creates simulations through the engine
+
+The code menu entry now passes the pasted code straight to `ISimulationEngine.CreateSimulation(string)` instead of decoding it in the UI. This uses the same entry point that future modules will use. The parameter form and the demo still call `CreateSimulation(ISimulationParameters)`.
+
+- `ISimulationEngine` gained `Parameters`, the validated parameters of the active run, or null before creation. The UI reads the step count and the code it displays from there, so the shown code always describes the run that was calculated.
+- The simulation is now created right after the menu choice, before the Enter/P run-mode prompt. Invalid parameters or codes are caught at that point. The footprint is built from `engine.Iterations[0].Map`, and unequal sides are reported on a "Cannot draw this map" screen.
+- Creation time is still counted in the "Elapsed" total, but is now measured separately and added to the step time.

@@ -150,12 +150,16 @@ internal sealed class DemoScreen : IDemoScreen
         // Keep the end of long input visible, which is where the cursor is.
         var visibleWidth = MaxPanelWidth - PanelPadding - 3;
         var visibleText = text.Length > visibleWidth ? "…" + text[^(visibleWidth - 1)..] : text;
-        Draw(title,
+        var errorLines = error is null ? [""] : WrapText(error, MaxPanelWidth - PanelPadding);
+        var lines = new List<(string Text, uint Color)>
+        {
             (label, Normal),
             ($"> {visibleText}_", Accent),
             ("", Normal),
-            (error ?? "", ErrorColor),
-            ("[Enter] Confirm    [Esc] Back", Muted));
+        };
+        lines.AddRange(errorLines.Select(line => (line, ErrorColor)));
+        lines.Add(("[Enter] Confirm    [Esc] Back", Muted));
+        Draw(title, lines.ToArray());
     }
 
     private void DrawProgress(DemoProgress progress, string title, string footer)

@@ -15,6 +15,9 @@ public interface ISimulationEngine
     /// </summary>
     IReadOnlyList<ISimulationStep> Iterations { get; }
 
+    /// <summary>Gets the validated parameters of the active run, or null before a simulation is created.</summary>
+    ISimulationParameters? Parameters { get; }
+
     /// <summary>Gets the active run's penguins by ID, starting at 1. Empty before a simulation is created.</summary>
     IReadOnlyDictionary<ushort, IPenguin> Penguins { get; }
 

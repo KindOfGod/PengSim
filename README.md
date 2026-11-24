@@ -1,6 +1,16 @@
 # PengSim
 
-PengSim is a .NET 10 terminal application for exploring a penguin simulation on a **hexagonal map**. The main menu offers three ways to start a run. **[1] Simulation from parameters** asks for each value in turn, pre-filled with the demo values. The placement seed is not asked for; the UI picks it at random, and the code in the analysis header keeps it. **[2] Simulation from code** decodes a parameter code produced by `SimulationParametersCodec`. **[3] Demo simulation** places 500 penguins on a hex with 125-cell sides (46,501 cells) and calculates 1,000 iterations, retaining 1,001 frames (about 2 MB of coordinate data, plus runtime overhead). Escape in a prompt returns to the menu. The renderer only draws hexes with three equal sides, so the parameter form asks for one side length and codes with unequal sides are rejected. The analysis header shows the run's parameter code next to its name. Paste it into **[2]** to recreate the same run, including the penguin placement, which is seeded. A progress bar shows the completed iterations and average iterations per second. When generation finishes, review the elapsed time, speed, and simulation details. Press A to analyze the run from its starting positions.
+PengSim is a .NET 10 terminal application for exploring a penguin simulation on a **hexagonal map**. The main menu offers three ways to start a run:
+
+- **[1] Simulation from parameters** asks for each value in turn, pre-filled with the demo values: the three side lengths A, B and C, the population, the number of steps, wind direction, wind speed and temperature. Every prompt shows its allowed range and repeats until the value fits. The placement seed is not asked for; the UI picks it at random.
+- **[2] Simulation from code** decodes a parameter code. If the code is malformed or describes invalid parameters, the prompt stays open and shows the reason.
+- **[3] Demo simulation** places 500 penguins on a hex with 125-cell sides (46,501 cells) and calculates 1,000 iterations, retaining 1,001 frames (about 2 MB of coordinate data, plus runtime overhead).
+
+Escape in a prompt returns to the menu. The renderer currently only draws hexes with three equal sides, so parameters or codes with unequal sides are rejected before the run starts.
+
+Next, choose how to calculate the run: **Enter** calculates all steps at once, and **P** calculates them one at a time with a progress bar. When generation finishes, review the elapsed time, speed, and simulation details, then press **A** to analyze the run from its starting positions.
+
+Every run has a **parameter code**. It is shown in the analysis header next to the run's name and printed to the terminal when the app exits. Paste it into **[2]** to recreate the same run, including the seeded penguin placement. Wind and temperature are part of the code but do not affect movement yet.
 
 ## Run
 
@@ -53,7 +63,7 @@ A run is described by `ISimulationParameters`: three hexagon side lengths A, B a
 
 Positions use axial hex coordinates with the origin (0, 0) at the hexagon's bottom-left corner. **R** is the row, counted upward from the bottom side. **Q** is the top-left-to-bottom-right diagonal, counted to the right from the lower-left side. Neighbors differ by (±1, 0), (0, ±1) or ±(1, 1). A cell is on the map when 0 ≤ R ≤ B + C − 2, 0 ≤ Q ≤ A + C − 2, and −(A − 1) ≤ R − Q ≤ B − 1, so coordinates are never negative.
 
-A run supports up to **65,535 penguins** (`ISimulationEngine.MaxPenguins`). The largest coordinate, A + C − 2 for Q and B + C − 2 for R, may be at most **65,535** (`MaxCoordinate`). Penguin IDs are consecutive `ushort` values starting at 1. Occupancy queries (`environment[position]`) return `null` for an empty cell.
+A run supports up to **65,535 penguins** (`ISimulationEngine.MaxPenguins`). The largest coordinate, A + C − 2 for Q and B + C − 2 for R, may be at most **65,535** (`MaxCoordinate`). Penguin IDs are consecutive `ushort` values starting at 1. Occupancy queries (`engine.Iterations[iteration][position]`) return the penguin ID on a cell, or `null` for an empty cell.
 
 Each iteration stores an array of `PenguinPosition` values in ID order. To read a penguin’s position, use `engine.Iterations[iteration].Positions[id - 1]`. Each entry contains two 16-bit coordinates (4 bytes). For 1,000 penguins and 1,000 steps, the coordinate payload of the 1,001 snapshots is 4,004,000 bytes, plus collection overhead. Board area does not affect this payload.
 

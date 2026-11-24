@@ -7,11 +7,13 @@ namespace PengSim.UI.Demo;
 /// <remarks>
 /// Asks for a single side length because the renderer only draws regular hexes.
 /// Only the uniform distribution exists, so the form does not ask for it.
+/// The placement seed is chosen at random; the parameter code shown in the
+/// analysis view keeps it, so a run can still be reproduced.
 /// </remarks>
 internal sealed class SimulationParameterForm : ISimulationParameterForm
 {
     private const string Title = "Simulation from parameters";
-    private const int FieldCount = 7;
+    private const int FieldCount = 6;
     private const string WholeNumberHint = "Enter a whole number from 0 to 65535.";
     private const string DecimalHint = "Enter a number such as -12.5.";
 
@@ -19,11 +21,10 @@ internal sealed class SimulationParameterForm : ISimulationParameterForm
     {
         if (Ask<ushort>(screen, 1, "Hex side length in cells", defaults.SideA, WholeNumberHint) is not { } side
             || Ask<ushort>(screen, 2, "Number of penguins", defaults.PenguinPopulation, WholeNumberHint) is not { } population
-            || Ask<ushort>(screen, 3, "Placement seed", defaults.PenguinDistributionSeed, WholeNumberHint) is not { } seed
-            || Ask<ushort>(screen, 4, "Steps to simulate", defaults.SimulatedSteps, WholeNumberHint) is not { } steps
-            || Ask<float>(screen, 5, "Wind direction in degrees", defaults.WindDirectionDegrees, DecimalHint) is not { } windDirection
-            || Ask<float>(screen, 6, "Wind speed in m/s", defaults.WindSpeedMetersPerSecond, DecimalHint) is not { } windSpeed
-            || Ask<float>(screen, 7, "Temperature in °C", defaults.TemperatureCelsius, DecimalHint) is not { } temperature)
+            || Ask<ushort>(screen, 3, "Steps to simulate", defaults.SimulatedSteps, WholeNumberHint) is not { } steps
+            || Ask<float>(screen, 4, "Wind direction in degrees", defaults.WindDirectionDegrees, DecimalHint) is not { } windDirection
+            || Ask<float>(screen, 5, "Wind speed in m/s", defaults.WindSpeedMetersPerSecond, DecimalHint) is not { } windSpeed
+            || Ask<float>(screen, 6, "Temperature in °C", defaults.TemperatureCelsius, DecimalHint) is not { } temperature)
         {
             return null;
         }
@@ -35,7 +36,7 @@ internal sealed class SimulationParameterForm : ISimulationParameterForm
             SideC = side,
             PenguinPopulation = population,
             PenguinDistribution = PenguinDistribution.Uniform,
-            PenguinDistributionSeed = seed,
+            PenguinDistributionSeed = (ushort)Random.Shared.Next(ushort.MaxValue + 1),
             SimulatedSteps = steps,
             WindDirectionDegrees = windDirection,
             WindSpeedMetersPerSecond = windSpeed,

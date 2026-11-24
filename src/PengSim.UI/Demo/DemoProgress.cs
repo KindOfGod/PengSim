@@ -6,5 +6,7 @@ internal readonly record struct DemoProgress(
     TimeSpan TotalTime,
     TimeSpan IterationTime,
     int Penguins,
-    ushort MapSide,
+    ushort SideA,
+    ushort SideB,
+    ushort SideC,
     long MapCells);

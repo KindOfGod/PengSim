@@ -16,7 +16,6 @@ internal sealed class SimulationDemo(
     ISimulationParametersCodec codec,
     Func<IDemoScreen> createScreen) : ISimulationDemo
 {
-    // The renderer draws regular hexes, so the demo uses equal sides.
     private const ushort HexSideLength = 125;
     private const ushort PenguinCount = 500;
     private const ushort IterationCount = 1_000;
@@ -82,16 +81,12 @@ internal sealed class SimulationDemo(
             }
 
             var (name, creationTime) = created;
-            if (TryCreateFootprint(engine.Iterations[0].Map, screen) is not { } board)
-            {
-                continue;
-            }
-
             if (screen.WaitForRunMode(name) is not { } mode)
             {
                 continue;
             }
 
+            var board = new HexFootprint(engine.Iterations[0].Map);
             var result = Generate(mode, screen, creationTime);
             var simulationCode = codec.Encode(ActiveParameters);
             if (screen.WaitForAnalysis(result))
@@ -171,20 +166,6 @@ internal sealed class SimulationDemo(
         }
     }
 
-    /// <summary>Builds the drawing footprint for the map, or shows why the renderer cannot draw it and returns null.</summary>
-    private static HexFootprint? TryCreateFootprint(IHexMap map, IDemoScreen screen)
-    {
-        try
-        {
-            return new HexFootprint(map);
-        }
-        catch (ArgumentException exception)
-        {
-            screen.ShowError("Cannot draw this map", exception.Message);
-            return null;
-        }
-    }
-
     /// <summary>
     /// Calculates the created simulation. <see cref="RunMode.Fast"/> runs all steps at once with
     /// <see cref="ISimulationEngine.Exec"/>; <see cref="RunMode.WithProgress"/> runs one step at a time
@@ -230,7 +211,7 @@ internal sealed class SimulationDemo(
     {
         var map = engine.Iterations[0].Map;
         return new DemoProgress(engine.Iterations.Count - 1, totalSteps, totalTime,
-            iterationTime, engine.Penguins.Count, map.SideA, map.CellCount);
+            iterationTime, engine.Penguins.Count, map.SideA, map.SideB, map.SideC, map.CellCount);
     }
 
     /// <summary>Runs the action and returns how long it took.</summary>

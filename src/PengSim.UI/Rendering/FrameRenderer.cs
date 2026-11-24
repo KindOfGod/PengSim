@@ -159,7 +159,7 @@ internal sealed class FrameRenderer(
             : null;
 
         DrawCells(screen, footprint, heatmap, overviewLevel,
-            minimap.CenteredContent(default), minimap.X + 1, minimap.Y + 1,
+            minimap.CenteredContent(heatmap.GetRegion(overviewLevel).Center), minimap.X + 1, minimap.Y + 1,
             selection, selectedCenter);
     }
 
@@ -199,6 +199,7 @@ internal sealed class FrameRenderer(
         MinimapViewport? selection, HexCell? cameraCenter)
     {
         var world = level == 0 ? footprint.Region : heatmap.GetRegion(level);
+        var worldWithBorder = world.Expand(1);
 
         for (var y = 0; y < bounds.Height; y++)
         {
@@ -211,7 +212,7 @@ internal sealed class FrameRenderer(
             {
                 var mapX = bounds.Left + x;
                 var cell = new HexCell((mapX - row) / 2, row);
-                var paint = GetCellPaint(heatmap, world, level, cell);
+                var paint = GetCellPaint(heatmap, world, worldWithBorder, level, cell);
 
                 if (cameraCenter is { } center && cell == center)
                 {
@@ -229,21 +230,20 @@ internal sealed class FrameRenderer(
 
     /// <summary>
     /// L0 reads the selected frame’s occupied cells. Coarser hex cells use the
-    /// sparse aggregate index. Only cells at distance R+1 from the *world*
-    /// center get the teal border; the camera perimeter never gets it.
+    /// sparse aggregate index. Only the ring of cells just outside the *world*
+    /// gets the teal border; the camera perimeter never gets it.
     /// </summary>
     private TerminalPixel GetCellPaint(
         IHexHeatmap heatmap,
-        HexRegion world, int level, HexCell cell)
+        HexRegion world, HexRegion worldWithBorder, int level, HexCell cell)
     {
-        var distance = cell.DistanceTo(world.Center);
-        if (distance <= world.Radius)
+        if (world.Contains(cell))
         {
             var population = heatmap.GetPopulation(level, cell);
             return palette.GetDensityPaint(population);
         }
 
-        return distance == world.Radius + 1
+        return worldWithBorder.Contains(cell)
             ? palette.WorldEdgePaint
             : palette.OutsidePaint;
     }

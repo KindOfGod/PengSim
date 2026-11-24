@@ -175,7 +175,7 @@ internal sealed class DemoScreen : IDemoScreen
             ($"Speed      {speed:N1} steps/s", Normal),
             ("", Normal),
             ($"Penguins   {progress.Penguins:N0}", Normal),
-            ($"Map        side {progress.MapSide:N0}, {progress.MapCells:N0} cells", Normal),
+            ($"Map        sides {progress.SideA}/{progress.SideB}/{progress.SideC}, {progress.MapCells:N0} cells", Normal),
             ($"Frames     {progress.CompletedSteps + 1:N0} in memory", Normal),
             ("", Normal),
             (footer, Accent));

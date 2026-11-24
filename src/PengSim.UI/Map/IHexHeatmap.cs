@@ -14,6 +14,9 @@ internal interface IHexHeatmap
     /// <summary>Gets the enclosing hex region at the given aggregate zoom level.</summary>
     HexRegion GetRegion(int zoom);
 
-    /// <summary>Chooses the finest aggregate level whose world fits within the requested radius.</summary>
-    (int Level, HexRegion Region) FitWorld(int maxRadius);
+    /// <summary>
+    /// Chooses the finest aggregate level whose world spans at most <paramref name="maxColumns"/>
+    /// screen columns and <paramref name="maxRows"/> rows, and returns it with its region.
+    /// </summary>
+    (int Level, HexRegion Region) FitWorld(int maxColumns, int maxRows);
 }

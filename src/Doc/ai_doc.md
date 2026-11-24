@@ -290,3 +290,16 @@ The code menu entry now passes the pasted code straight to `ISimulationEngine.Cr
 - `ISimulationEngine` gained `Parameters`, the validated parameters of the active run, or null before creation. The UI reads the step count and the code it displays from there, so the shown code always describes the run that was calculated.
 - The simulation is now created right after the menu choice, before the Enter/P run-mode prompt. Invalid parameters or codes are caught at that point. The footprint is built from `engine.Iterations[0].Map`, and unequal sides are reported on a "Cannot draw this map" screen.
 - Creation time is still counted in the "Elapsed" total, but is now measured separately and added to the step time.
+
+## Hexes with unequal sides
+
+The renderer now draws any hex with sides A, B, and C, so the form's three side lengths and codes with unequal sides run instead of ending on an error screen.
+
+- `HexRegion` changed from a center and radius to a range for each of Q, R, and S = −Q − R. Every hexagon whose opposite sides are equal is exactly such a set, and a regular hex of radius n has all three ranges at [−n, n]. The region provides containment, a one-cell expansion, the cells of a row, and the screen column range.
+- `HexFootprint` builds the region straight from the `IHexMap` bounds: Q in [0, MaxQ], R in [0, MaxR], and the map's R − Q in [−(A − 1), B − 1], shifted by the center and with R flipped. The equal-sides check and the square storage grid were removed. `ClampToBounds` keeps the camera inside the screen rectangle around the region.
+- `HexHeatmap` measures each zoom level's region by converting the perimeter cells (both ends of every row, and the full top and bottom rows) with `ToLevel` and taking the ranges. The old radius only scanned row ends; the full top and bottom rows were added because the cube-rounding correction can shift R inside a row. `FitWorld` now takes a column and row budget instead of a radius. Each level caches its column width, so the per-frame overview fit does not loop over rows.
+- The aggregation lattice stays anchored at the map center. That hexagon is point-symmetric even with unequal sides, so opposite sides get the same padding at coarse levels. A corner anchor (or 7-cell clusters) was considered: neither makes a side exact, because hex buckets have zigzag edges, and 7-cell clusters would also rotate the lattice by about 19° per level.
+- The world border is now "inside the region expanded by one cell, but outside the region". For regular hexes this is the same as the old "distance == R + 1".
+- The camera's staggered offset conversion moved into `MapCamera` and no longer depends on the hex radius. `HexCell.DistanceTo` became unused and was removed.
+- The summary screen shows all three sides. The "Cannot draw this map" screen was removed.
+- Regression check: the redirected overview of the 125/125/125 demo is identical to the output from before the change, once penguin glyphs and the code are normalized.

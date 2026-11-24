@@ -21,14 +21,14 @@ internal sealed class HexHeatmap : IHexHeatmap
         _footprint = footprint;
         _scale = scale;
 
-        // World size and bucket coordinates never change between iterations.
-        // Only keep the enclosing hex for each zoom level, not every base cell.
         for (var zoom = 1; zoom <= MaximumZoomLevel; zoom++)
         {
-            var radius = GetCoarseRadius(footprint.Radius, zoom);
-            _levels.Add(new Level(new HexRegion(default, radius), new Dictionary<HexCell, int>()));
+            var region = GetCoarseRegion(footprint.Region, zoom);
+            var (left, right) = region.GetScreenColumns();
+            _levels.Add(new Level(region, right - left + 1, new Dictionary<HexCell, int>()));
 
-            if (radius == 0)
+            var isSingleBucket = region.MinQ == region.MaxQ && region.MinR == region.MaxR;
+            if (isSingleBucket)
             {
                 break;
             }
@@ -82,12 +82,17 @@ internal sealed class HexHeatmap : IHexHeatmap
         return _levels[zoom - 1].Counts.GetValueOrDefault(cell);
     }
 
-    public HexRegion GetRegion(int zoom) => _levels[zoom - 1].Region;
-
-    /// <summary>Use the finest level whose entire hexagonal world fits.</summary>
-    public (int Level, HexRegion Region) FitWorld(int maxRadius)
+    /// <inheritdoc />
+    public HexRegion GetRegion(int zoom)
     {
-        var index = _levels.FindIndex(level => level.Region.Radius <= maxRadius);
+        return _levels[zoom - 1].Region;
+    }
+
+    /// <inheritdoc />
+    /// <remarks>Falls back to the coarsest level when no level fits.</remarks>
+    public (int Level, HexRegion Region) FitWorld(int maxColumns, int maxRows)
+    {
+        var index = _levels.FindIndex(level => level.Columns <= maxColumns && level.Region.RowCount <= maxRows);
         if (index < 0)
         {
             index = _levels.Count - 1;
@@ -97,23 +102,56 @@ internal sealed class HexHeatmap : IHexHeatmap
     }
 
     /// <summary>
-    /// Find the enclosing coarse-world radius from the two ends of each
-    /// hexagonal row. Interior points cannot extend its outer radius.
+    /// Returns the smallest region at <paramref name="zoom"/> that holds the bucket of every
+    /// base cell. Only perimeter cells are converted, because buckets of interior cells
+    /// lie between those of the perimeter.
     /// </summary>
-    private int GetCoarseRadius(int radius, int zoom)
+    private HexRegion GetCoarseRegion(HexRegion baseRegion, int zoom)
     {
-        var result = 0;
-        for (var row = -radius; row <= radius; row++)
+        var bounds = new BucketBounds();
+        for (var r = baseRegion.MinR; r <= baseRegion.MaxR; r++)
         {
-            var left = new HexCell(Math.Max(-radius, -row - radius), row);
-            var right = new HexCell(Math.Min(radius, -row + radius), row);
-            result = Math.Max(result, Math.Max(
-                _scale.ToLevel(left, zoom).DistanceTo(default),
-                _scale.ToLevel(right, zoom).DistanceTo(default)));
+            var (firstQ, lastQ) = baseRegion.GetRow(r);
+            var isTopOrBottomRow = r == baseRegion.MinR || r == baseRegion.MaxR;
+            var step = isTopOrBottomRow ? 1 : Math.Max(1, lastQ - firstQ);
+            for (var q = firstQ; q <= lastQ; q += step)
+            {
+                bounds.Include(_scale.ToLevel(new HexCell(q, r), zoom));
+            }
         }
 
-        return result;
+        return bounds.ToRegion();
     }
 
-    private readonly record struct Level(HexRegion Region, Dictionary<HexCell, int> Counts);
+    /// <summary>The bucket counts and screen width of one aggregate zoom level.</summary>
+    private readonly record struct Level(HexRegion Region, int Columns, Dictionary<HexCell, int> Counts);
+
+    /// <summary>Collects the Q, R, and S ranges of the buckets passed to <see cref="Include"/>.</summary>
+    private sealed class BucketBounds
+    {
+        private int _minQ = int.MaxValue;
+        private int _maxQ = int.MinValue;
+        private int _minR = int.MaxValue;
+        private int _maxR = int.MinValue;
+        private int _minS = int.MaxValue;
+        private int _maxS = int.MinValue;
+
+        /// <summary>Widens the ranges so they contain <paramref name="bucket"/>.</summary>
+        public void Include(HexCell bucket)
+        {
+            var s = -bucket.Q - bucket.R;
+            _minQ = Math.Min(_minQ, bucket.Q);
+            _maxQ = Math.Max(_maxQ, bucket.Q);
+            _minR = Math.Min(_minR, bucket.R);
+            _maxR = Math.Max(_maxR, bucket.R);
+            _minS = Math.Min(_minS, s);
+            _maxS = Math.Max(_maxS, s);
+        }
+
+        /// <summary>Returns the region described by the collected ranges.</summary>
+        public HexRegion ToRegion()
+        {
+            return new HexRegion(_minQ, _maxQ, _minR, _maxR, _minS, _maxS);
+        }
+    }
 }

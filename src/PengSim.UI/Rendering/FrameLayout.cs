@@ -34,6 +34,9 @@ internal readonly record struct FrameLayout(
     private const int MinMainHeight = 5;
     private const int MinMinimapHeight = 3;
 
+    /// <summary>Extra columns and rows kept free around the overview for the teal world-border dots.</summary>
+    private const int WorldBorderReserve = 2;
+
     public bool Fits => Width >= 24 && Height >= 14 && Main.Height >= 3 && Minimap.Height >= 3;
     public bool InlineLegend => FitsInlineLegend(Map.Width);
     public int LegendColumns => GetLegendColumns(Map.Width);
@@ -88,11 +91,7 @@ internal readonly record struct FrameLayout(
         var availableWidth = Math.Max(1, Math.Min(Map.Width, Minimap.Width) - 2);
         var availableHeight = Math.Max(1, Math.Min(Map.Height, Minimap.Height) - 2);
 
-        // An axial hex of radius R spans 4R+1 columns and 2R+1 rows.
-        // Reserve an extra cell for the teal world-border dots.
-        var radius = Math.Max(0,
-            Math.Min((availableWidth - 3) / 4, (availableHeight - 3) / 2));
-        return heatmap.FitWorld(radius);
+        return heatmap.FitWorld(availableWidth - WorldBorderReserve, availableHeight - WorldBorderReserve);
     }
 
     private static bool FitsInlineLegend(int width)

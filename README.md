@@ -6,7 +6,7 @@ PengSim is a .NET 10 terminal application for exploring a penguin simulation on 
 - **[2] Simulation from code** decodes a parameter code. If the code is malformed or describes invalid parameters, the prompt stays open and shows the reason.
 - **[3] Demo simulation** places 500 penguins on a hex with 125-cell sides (46,501 cells) and calculates 1,000 iterations, retaining 1,001 frames (about 2 MB of coordinate data, plus runtime overhead).
 
-Escape in a prompt returns to the menu. The renderer currently only draws hexes with three equal sides, so parameters or codes with unequal sides are rejected before the run starts.
+Escape in a prompt returns to the menu.
 
 Next, choose how to calculate the run: **Enter** calculates all steps at once, and **P** calculates them one at a time with a progress bar. When generation finishes, review the elapsed time, speed, and simulation details, then press **A** to analyze the run from its starting positions.
 

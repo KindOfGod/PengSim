@@ -34,14 +34,14 @@ public interface IHexMap
 
     /// <summary>
     /// Gets the cell at the hexagon's geometric center. When the center falls between
-    /// cells, gets the neighboring cell with the smaller coordinates.
+    /// cells, Q and R are rounded down.
     /// </summary>
     PenguinPosition Center { get; }
 
     /// <summary>Checks whether a coordinate pair, which may be negative or too large, lies on the map.</summary>
     bool Contains(int q, int r);
 
-    /// <summary>Returns the number of single-cell steps between two cells.</summary>
+    /// <summary>Returns the number of neighbor-to-neighbor steps on the shortest path between two cells.</summary>
     int Distance(PenguinPosition from, PenguinPosition to);
 
     /// <summary>

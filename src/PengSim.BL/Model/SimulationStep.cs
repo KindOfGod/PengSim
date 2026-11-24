@@ -3,14 +3,19 @@ using PengSim.BL.Contracts;
 
 namespace PengSim.BL.Model;
 
-/// <summary>Read-only positions for one simulation iteration.</summary>
+/// <inheritdoc />
 public sealed class SimulationStep : ISimulationStep
 {
+    /// <summary>The positions in ID order, kept as a collection so the indexer can search it.</summary>
     private readonly ReadOnlyCollection<PenguinPosition> _positions;
 
+    /// <inheritdoc />
     public IHexMap Map { get; }
+
+    /// <inheritdoc />
     public IReadOnlyList<PenguinPosition> Positions => _positions;
 
+    /// <inheritdoc />
     public ushort? this[PenguinPosition position]
     {
         get
@@ -20,6 +25,7 @@ public sealed class SimulationStep : ISimulationStep
         }
     }
 
+    /// <summary>Creates a step for the given map that shows <paramref name="positions"/> without copying them.</summary>
     internal SimulationStep(IHexMap map, ReadOnlyCollection<PenguinPosition> positions)
     {
         Map = map;

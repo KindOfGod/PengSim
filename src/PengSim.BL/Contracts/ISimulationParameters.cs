@@ -18,25 +18,25 @@ public interface ISimulationParameters
     /// <summary>Gets the number of cells along the upper-left and lower-right sides.</summary>
     ushort SideC { get; }
 
-    /// <summary>Gets the number of penguins placed before the first iteration.</summary>
+    /// <summary>Gets the number of penguins placed before the first iteration. At least 1 and at most the map's cell count.</summary>
     ushort PenguinPopulation { get; }
 
     /// <summary>Gets how penguins are spread across the map before the first iteration.</summary>
     PenguinDistribution PenguinDistribution { get; }
 
-    /// <summary>A seed for reproducing the distribution of the penguins.</summary>
+    /// <summary>Gets the random seed for the initial placement, so the same seed gives the same placement.</summary>
     ushort PenguinDistributionSeed { get; }
 
-    /// <summary>Gets the number of iterations to calculate.</summary>
+    /// <summary>Gets the number of steps to calculate after the initial placement. At least 1.</summary>
     ushort SimulatedSteps { get; }
 
     /// <summary>Gets the direction the wind blows from, in degrees within [0, 360).</summary>
     float WindDirectionDegrees { get; }
 
-    /// <summary>Gets the non-negative wind speed in meters per second.</summary>
+    /// <summary>Gets the finite, non-negative wind speed in meters per second.</summary>
     float WindSpeedMetersPerSecond { get; }
 
-    /// <summary>Gets the air temperature in degrees Celsius.</summary>
+    /// <summary>Gets the finite air temperature in degrees Celsius.</summary>
     float TemperatureCelsius { get; }
 
     /// <summary>

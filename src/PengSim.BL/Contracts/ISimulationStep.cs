@@ -11,6 +11,9 @@ public interface ISimulationStep
     /// <summary>Gets read-only positions in ID order. The position for ID n is at index n - 1.</summary>
     IReadOnlyList<PenguinPosition> Positions { get; }
 
-    /// <summary>Searches this frame for the penguin ID at the given cell, returning null for an empty cell.</summary>
+    /// <summary>
+    /// Gets the ID of the penguin on the given cell, or null for an empty cell.
+    /// The lookup searches <see cref="Positions"/>, so it takes time proportional to the population.
+    /// </summary>
     ushort? this[PenguinPosition position] { get; }
 }

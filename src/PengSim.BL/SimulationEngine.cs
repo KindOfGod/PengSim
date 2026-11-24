@@ -1,13 +1,13 @@
 using System.Collections.ObjectModel;
 using PengSim.BL.Contracts;
 using PengSim.BL.Model;
-using PengSim.BL.Parameters;
 
 namespace PengSim.BL;
 
 /// <inheritdoc />
 public sealed class SimulationEngine : ISimulationEngine
 {
+    /// <summary>The active run, or null before the first call to <see cref="CreateSimulation(ISimulationParameters)"/>.</summary>
     private ISimulation? _simulation;
 
     /// <inheritdoc />
@@ -23,7 +23,7 @@ public sealed class SimulationEngine : ISimulationEngine
         _simulation = new Simulation(parameters);
         return this;
     }
-    
+
     /// <inheritdoc />
     public ISimulationEngine CreateSimulation(string code)
     {
@@ -34,15 +34,23 @@ public sealed class SimulationEngine : ISimulationEngine
     /// <inheritdoc />
     public void Step()
     {
-        if (_simulation is null) throw new InvalidOperationException("Simulation was not created yet.");
-        
-        _simulation.Step();
+        GetActiveSimulation().Step();
     }
 
+    /// <inheritdoc />
     public void Exec()
     {
-        if (_simulation is null) throw new InvalidOperationException("Simulation was not created yet.");
+        GetActiveSimulation().Exec();
+    }
 
-        _simulation?.Exec();
+    /// <summary>Returns the active run, or throws when no simulation was created yet.</summary>
+    private ISimulation GetActiveSimulation()
+    {
+        if (_simulation is null)
+        {
+            throw new InvalidOperationException("Simulation was not created yet.");
+        }
+
+        return _simulation;
     }
 }

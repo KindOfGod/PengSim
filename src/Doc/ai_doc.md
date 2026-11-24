@@ -258,3 +258,19 @@ The BL no longer uses offset or Cartesian coordinates. Before, positions were of
 ## Fast run or progress bar
 
 After a simulation is chosen and validated, the UI asks how to calculate it: Enter runs all steps at once with `ISimulationEngine.Exec()`, and P runs them one at a time with `Step()` and the progress bar, as before. Escape goes back to the menu. The fast mode only shows a static "Calculating all steps…" panel, so it skips the progress redraws and the per-step stopwatch reads. Redirected runs always use the fast mode. The summary screen after the run shows the same timings in both modes, so the two can be compared.
+
+## BL documentation and readability pass
+
+Inline comments in the BL were replaced with descriptive names (for example `isBetweenSidesA`, `stepsToCenter`, `previousPositions`) or moved into `<remarks>`. Every type, member, and field now has a doc comment, and implementations use `<inheritdoc />`. Several doc comments were wrong and have been corrected:
+
+- The codec's remarks described a fixed-point float format with `FixedPointScale` and `SignedOffset`, and an optional seed. None of these exist: floats are stored as their raw IEEE 754 bits. The remarks now describe the real format.
+- `CreateSimulation(string)` claimed to return "the created simulation object". It returns the engine.
+- `IPenguin.Id` mentioned an occupancy grid that no longer exists. It now says the ID is the 1-based index into each step's positions.
+- `SimulationParameters` said it was "typically read from JSON". It is entered in the UI or decoded from a code. An unused `System.Text.Json` using was removed.
+
+Small code changes made along the way:
+
+- The codec no longer maps the wind direction to (-180, 180] before encoding. That only mattered for the old fixed-point range, and with raw bits it could add rounding errors. Old codes still decode the same way.
+- `Decode` now requires exactly ten segments instead of at least ten, so codes with trailing extra segments are rejected.
+- `Simulation` dropped the unused `SimulationCode` property and the private constructor that existed only for it. `Parameters` is now a private field.
+- `SimulationEngine.Step` and `Exec` share a guard helper that uses braces, as the repository conventions require.

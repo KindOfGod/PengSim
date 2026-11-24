@@ -7,36 +7,41 @@ namespace PengSim.BL.Model;
 /// <summary>Owns the penguins, working occupancy, and recorded positions of one run.</summary>
 internal sealed class Simulation : ISimulation
 {
+    /// <summary>Decodes parameter codes for <see cref="Simulation(string)"/>.</summary>
     private static readonly ISimulationParametersCodec Codec = new SimulationParametersCodec();
 
+    /// <summary>The validated parameters this run was created from.</summary>
+    private readonly ISimulationParameters _parameters;
+
+    /// <summary>The map all penguins move on.</summary>
     private readonly IHexMap _map;
+
+    /// <summary>The penguins by ID, starting at 1.</summary>
     private readonly Dictionary<ushort, IPenguin> _penguins = [];
-    private readonly HashSet<PenguinPosition> _occupied = [];
+
+    /// <summary>The cells occupied in the latest frame, updated while a step runs.</summary>
+    private readonly HashSet<PenguinPosition> _occupiedCells = [];
+
+    /// <summary>The placement positions, which frame zero shows.</summary>
     private readonly List<PenguinPosition> _initialPositions = [];
+
+    /// <summary>The recorded frames, starting with the initial placement.</summary>
     private readonly List<ISimulationStep> _frames = [];
 
+    /// <inheritdoc />
     public IReadOnlyList<ISimulationStep> Frames { get; }
+
+    /// <inheritdoc />
     public IReadOnlyDictionary<ushort, IPenguin> Penguins { get; }
-    public ISimulationParameters Parameters { get; }
-    public string SimulationCode { get; }
 
-    /// <summary>Creates a simulation from a snapshot of the given parameters and places its penguins.</summary>
+    /// <summary>
+    /// Validates the parameters, creates the map, and places the penguins as frame zero.
+    /// Throws an <see cref="ArgumentException"/> when the parameters are invalid.
+    /// </summary>
     public Simulation(ISimulationParameters parameters)
-        : this(parameters, Codec.Encode(parameters))
     {
-    }
-
-    /// <summary>Creates a simulation from an encoded parameter code and places its penguins.</summary>
-    public Simulation(string code)
-        : this(Codec.Decode(code), code)
-    {
-    }
-
-    private Simulation(ISimulationParameters parameters, string code)
-    {
-        Parameters = parameters;
-        Parameters.Validate();
-        SimulationCode = code;
+        parameters.Validate();
+        _parameters = parameters;
         _map = new HexMap(parameters.SideA, parameters.SideB, parameters.SideC);
 
         _frames.Add(new SimulationStep(_map, _initialPositions.AsReadOnly()));
@@ -45,32 +50,42 @@ internal sealed class Simulation : ISimulation
         PlacePenguins();
     }
 
-    public void Step()
+    /// <summary>Decodes a parameter code and creates the simulation it describes, like <see cref="Simulation(ISimulationParameters)"/>.</summary>
+    public Simulation(string code)
+        : this(Codec.Decode(code))
     {
-        var previous = _frames[^1];
-        var next = new PenguinPosition[previous.Positions.Count];
-        for (var index = 0; index < next.Length; index++)
-        {
-            var id = (ushort)(index + 1);
-            var current = previous.Positions[index];
-            var destination = _penguins[id].Move(current, _map, _occupied);
-            if (current != destination)
-            {
-                _occupied.Remove(current);
-                _occupied.Add(destination);
-            }
-
-            next[index] = destination;
-        }
-
-        _frames.Add(new SimulationStep(_map, Array.AsReadOnly(next)));
     }
 
+    /// <inheritdoc />
+    public void Step()
+    {
+        var previousPositions = _frames[^1].Positions;
+        var nextPositions = new PenguinPosition[previousPositions.Count];
+        for (var index = 0; index < nextPositions.Length; index++)
+        {
+            var id = (ushort)(index + 1);
+            var current = previousPositions[index];
+            var destination = _penguins[id].Move(current, _map, _occupiedCells);
+            if (current != destination)
+            {
+                _occupiedCells.Remove(current);
+                _occupiedCells.Add(destination);
+            }
+
+            nextPositions[index] = destination;
+        }
+
+        _frames.Add(new SimulationStep(_map, Array.AsReadOnly(nextPositions)));
+    }
+
+    /// <inheritdoc />
     public void Exec()
     {
-        while (_frames.Count <= Parameters.SimulatedSteps)
+        var recordedSteps = _frames.Count - 1;
+        while (recordedSteps < _parameters.SimulatedSteps)
         {
             Step();
+            recordedSteps++;
         }
     }
 
@@ -80,22 +95,27 @@ internal sealed class Simulation : ISimulation
     /// </summary>
     private void PlacePenguins()
     {
-        if (Parameters.PenguinDistribution != PenguinDistribution.Uniform)
+        if (_parameters.PenguinDistribution != PenguinDistribution.Uniform)
         {
-            throw new NotSupportedException($"Distribution {Parameters.PenguinDistribution} is not implemented.");
+            throw new NotSupportedException($"Distribution {_parameters.PenguinDistribution} is not implemented.");
         }
 
-        var random = new Random(Parameters.PenguinDistributionSeed);
-        while (_penguins.Count < Parameters.PenguinPopulation)
+        var random = new Random(_parameters.PenguinDistributionSeed);
+        while (_penguins.Count < _parameters.PenguinPopulation)
         {
             var position = _map.GetRandomPosition(random);
-            if (!_occupied.Contains(position))
+            if (!_occupiedCells.Contains(position))
             {
                 AddPenguin(position);
             }
         }
     }
 
+    /// <summary>
+    /// Adds a penguin with the next ID at <paramref name="position"/> in frame zero.
+    /// Throws when a step was already recorded, the population limit is reached,
+    /// or the cell is off the map or occupied.
+    /// </summary>
     private void AddPenguin(PenguinPosition position)
     {
         if (_frames.Count > 1)
@@ -113,7 +133,7 @@ internal sealed class Simulation : ISimulation
             throw new ArgumentOutOfRangeException(nameof(position), position, "The cell is not on the map.");
         }
 
-        if (!_occupied.Add(position))
+        if (!_occupiedCells.Add(position))
         {
             throw new InvalidOperationException("The cell already contains a penguin.");
         }

@@ -5,87 +5,94 @@ namespace PengSim.BL.Parameters;
 
 /// <inheritdoc />
 /// <remarks>
-/// Every field is written as a hex number without leading zeros, and the numbers are
-/// joined with <see cref="Delimiter"/>. Floats are stored as fixed-point values with
-/// two decimals (<see cref="FixedPointScale"/>), so any further digits are rounded away.
-/// To allow negative values, <see cref="SignedOffset"/> is added before storing, giving
-/// a range of -327.68 to 327.67. The wind direction is stored within (-180, 180].
-/// A missing seed is written as an empty segment.
+/// The code holds ten segments joined with <see cref="Delimiter"/>, in this order: the three sides,
+/// population, distribution, seed, steps, wind direction, wind speed, and temperature.
+/// Whole numbers are written as hex numbers without leading zeros. Floats are written as
+/// the hex form of their 32-bit IEEE 754 bits, so they decode to exactly the same value.
 /// </remarks>
 public sealed class SimulationParametersCodec : ISimulationParametersCodec
 {
+    /// <summary>Separates the segments. It is not a hex digit, so it cannot appear inside a segment.</summary>
     private const char Delimiter = 'y';
+
+    /// <summary>The number of segments in a valid code.</summary>
+    private const int SegmentCount = 10;
 
     /// <inheritdoc />
     public string Encode(ISimulationParameters parameters)
     {
         string[] segments =
         [
-            Short2Hex(parameters.SideA),
-            Short2Hex(parameters.SideB),
-            Short2Hex(parameters.SideC),
-            Short2Hex(parameters.PenguinPopulation),
-            Short2Hex((ushort)parameters.PenguinDistribution),
-            Short2Hex(parameters.PenguinDistributionSeed),
-            Short2Hex(parameters.SimulatedSteps),
-            // Stored as (-180, 180] to fit the range; the setter normalizes it back on decode
-            Float2Hex(parameters.WindDirectionDegrees > 180
-                ? parameters.WindDirectionDegrees - 360
-                : parameters.WindDirectionDegrees),
-            Float2Hex(parameters.WindSpeedMetersPerSecond),
-            Float2Hex(parameters.TemperatureCelsius),
+            UShortToHex(parameters.SideA),
+            UShortToHex(parameters.SideB),
+            UShortToHex(parameters.SideC),
+            UShortToHex(parameters.PenguinPopulation),
+            UShortToHex((ushort)parameters.PenguinDistribution),
+            UShortToHex(parameters.PenguinDistributionSeed),
+            UShortToHex(parameters.SimulatedSteps),
+            FloatToHex(parameters.WindDirectionDegrees),
+            FloatToHex(parameters.WindSpeedMetersPerSecond),
+            FloatToHex(parameters.TemperatureCelsius),
         ];
 
         return string.Join(Delimiter, segments);
     }
 
     /// <inheritdoc />
+    /// <remarks>
+    /// Throws an <see cref="ArgumentException"/> when the segment count is wrong or the decoded
+    /// parameters are invalid, and a <see cref="FormatException"/> or <see cref="OverflowException"/>
+    /// when a segment is not a hex number that fits its field.
+    /// </remarks>
     public ISimulationParameters Decode(string code)
     {
         var segments = code.Split(Delimiter);
-        var expectedNumberOfSegments = 10;
-
-        if (segments.Length < expectedNumberOfSegments)
+        if (segments.Length != SegmentCount)
         {
-            throw new ArgumentException($"Hash contains too few segments. Expected {expectedNumberOfSegments}, got {segments.Length}", nameof(code));
+            throw new ArgumentException(
+                $"The code must contain {SegmentCount} segments, but it contains {segments.Length}.", nameof(code));
         }
-        
+
         var parameters = new SimulationParameters
         {
-            SideA = Hex2Short(segments[0]),
-            SideB = Hex2Short(segments[1]),
-            SideC = Hex2Short(segments[2]),
-            PenguinPopulation = Hex2Short(segments[3]),
-            PenguinDistribution = (PenguinDistribution)Hex2Short(segments[4]),
-            PenguinDistributionSeed = Hex2Short(segments[5]),
-            SimulatedSteps = Hex2Short(segments[6]),
-            WindDirectionDegrees = Hex2Float(segments[7]),
-            WindSpeedMetersPerSecond = Hex2Float(segments[8]),
-            TemperatureCelsius = Hex2Float(segments[9]),
+            SideA = HexToUShort(segments[0]),
+            SideB = HexToUShort(segments[1]),
+            SideC = HexToUShort(segments[2]),
+            PenguinPopulation = HexToUShort(segments[3]),
+            PenguinDistribution = (PenguinDistribution)HexToUShort(segments[4]),
+            PenguinDistributionSeed = HexToUShort(segments[5]),
+            SimulatedSteps = HexToUShort(segments[6]),
+            WindDirectionDegrees = HexToFloat(segments[7]),
+            WindSpeedMetersPerSecond = HexToFloat(segments[8]),
+            TemperatureCelsius = HexToFloat(segments[9]),
         };
 
         parameters.Validate();
         return parameters;
     }
 
-    private static string Short2Hex(ushort value)
+    /// <summary>Writes a whole number as an uppercase hex number without leading zeros.</summary>
+    private static string UShortToHex(ushort value)
     {
         return value.ToString("X", CultureInfo.InvariantCulture);
     }
-    
-    private static string Float2Hex(float value)
+
+    /// <summary>Writes the 32-bit IEEE 754 bits of a float as an uppercase hex number.</summary>
+    private static string FloatToHex(float value)
     {
         return BitConverter.SingleToUInt32Bits(value).ToString("X", CultureInfo.InvariantCulture);
     }
-    
-    private static ushort Hex2Short(string segment)
+
+    /// <summary>Reads a hex segment written by <see cref="UShortToHex"/>.</summary>
+    private static ushort HexToUShort(string segment)
     {
         return ushort.Parse(segment, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture);
     }
 
-    private static float Hex2Float(string segment)
+    /// <summary>Reads a hex segment written by <see cref="FloatToHex"/>.</summary>
+    private static float HexToFloat(string segment)
     {
-        return BitConverter.UInt32BitsToSingle(
-            uint.Parse(segment, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture));
+        var bits = uint.Parse(segment, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture);
+        return BitConverter.UInt32BitsToSingle(bits);
     }
 }

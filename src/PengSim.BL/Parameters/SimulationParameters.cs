@@ -3,7 +3,7 @@ using PengSim.BL.Model;
 
 namespace PengSim.BL.Parameters;
 
-/// <summary>Immutable simulation parameters, typically read from JSON.</summary>
+/// <summary>Immutable simulation parameters, entered in the UI or decoded from a parameter code.</summary>
 public sealed record SimulationParameters : ISimulationParameters
 {
     /// <inheritdoc />
@@ -41,14 +41,14 @@ public sealed record SimulationParameters : ISimulationParameters
     /// <inheritdoc />
     public required float TemperatureCelsius { get; init; }
 
-    /// <summary>Throws if the parameters cannot describe a valid simulation.</summary>
+    /// <inheritdoc />
+    /// <remarks>The side lengths are checked by creating the <see cref="HexMap"/>.</remarks>
     public void Validate()
     {
-        // The map checks the side lengths and coordinate limits.
-        IHexMap map = new HexMap(SideA, SideB, SideC);
+        IHexMap mapWithValidSides = new HexMap(SideA, SideB, SideC);
 
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(PenguinPopulation);
-        ArgumentOutOfRangeException.ThrowIfGreaterThan((long)PenguinPopulation, map.CellCount, nameof(PenguinPopulation));
+        ArgumentOutOfRangeException.ThrowIfGreaterThan((long)PenguinPopulation, mapWithValidSides.CellCount, nameof(PenguinPopulation));
         if (!Enum.IsDefined(PenguinDistribution))
         {
             throw new ArgumentOutOfRangeException(
@@ -62,6 +62,7 @@ public sealed record SimulationParameters : ISimulationParameters
         ThrowIfNotFinite(TemperatureCelsius, nameof(TemperatureCelsius));
     }
 
+    /// <summary>Throws an <see cref="ArgumentOutOfRangeException"/> for NaN or infinite values.</summary>
     private static void ThrowIfNotFinite(float value, string name)
     {
         if (!float.IsFinite(value))

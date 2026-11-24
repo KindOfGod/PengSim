@@ -5,6 +5,7 @@ namespace PengSim.BL.Model;
 /// <inheritdoc />
 public sealed class HexMap : IHexMap
 {
+    /// <summary>The axial (Q, R) offsets from a cell to its six neighbors, counterclockwise from the right.</summary>
     private static readonly (int Q, int R)[] NeighborOffsets =
         [(1, 0), (1, 1), (0, 1), (-1, 0), (-1, -1), (0, -1)];
 
@@ -27,11 +28,12 @@ public sealed class HexMap : IHexMap
     public long CellCount { get; }
 
     /// <inheritdoc />
+    /// <remarks>The hexagon is point-symmetric, so its center is the midpoint of the Q and R ranges.</remarks>
     public PenguinPosition Center { get; }
 
     /// <summary>
-    /// Creates the map for the given side lengths. Each side needs at least one cell,
-    /// and A + C - 2 and B + C - 2 must fit in a ushort coordinate.
+    /// Creates the map for the given side lengths. Throws an <see cref="ArgumentOutOfRangeException"/>
+    /// when a side has no cells or when A + C - 2 or B + C - 2 exceeds <see cref="ISimulationEngine.MaxCoordinate"/>.
     /// </summary>
     public HexMap(ushort sideA, ushort sideB, ushort sideC)
     {
@@ -49,46 +51,45 @@ public sealed class HexMap : IHexMap
         MaxQ = (ushort)maxQ;
         MaxR = (ushort)maxR;
         CellCount = CountCells(sideA, sideB, sideC);
-
-        // The hexagon is point-symmetric, so its center is the midpoint of the bounding range.
         Center = new PenguinPosition((ushort)(maxQ / 2), (ushort)(maxR / 2));
     }
 
     /// <inheritdoc />
+    /// <remarks>Each pair of opposite sides bounds one axial value: R for A, Q for B, and R - Q for C.</remarks>
     public bool Contains(int q, int r)
     {
-        // Each pair of opposite sides bounds one axial value: r for A, q for B, and r - q for C.
-        var diagonal = r - q;
-        return r >= 0 && r <= MaxR
-            && q >= 0 && q <= MaxQ
-            && diagonal >= -(SideA - 1) && diagonal <= SideB - 1;
+        var isBetweenSidesA = r >= 0 && r <= MaxR;
+        var isBetweenSidesB = q >= 0 && q <= MaxQ;
+        var rowMinusDiagonal = r - q;
+        var isBetweenSidesC = rowMinusDiagonal >= -(SideA - 1) && rowMinusDiagonal <= SideB - 1;
+        return isBetweenSidesA && isBetweenSidesB && isBetweenSidesC;
     }
 
     /// <inheritdoc />
     public int Distance(PenguinPosition from, PenguinPosition to)
     {
-        var dq = to.Q - from.Q;
-        var dr = to.R - from.R;
-        return Math.Max(Math.Max(Math.Abs(dq), Math.Abs(dr)), Math.Abs(dq - dr));
+        var deltaQ = to.Q - from.Q;
+        var deltaR = to.R - from.R;
+        return Math.Max(Math.Max(Math.Abs(deltaQ), Math.Abs(deltaR)), Math.Abs(deltaQ - deltaR));
     }
 
     /// <inheritdoc />
+    /// <remarks>A cell center lies at x = q - r / 2 and y = r * sqrt(3) / 2, which gives dq² - dq·dr + dr².</remarks>
     public long SquaredEuclideanDistance(PenguinPosition from, PenguinPosition to)
     {
-        // A cell center lies at x = q - r / 2 and y = r * sqrt(3) / 2.
-        long dq = to.Q - from.Q;
-        long dr = to.R - from.R;
-        return dq * dq - dq * dr + dr * dr;
+        long deltaQ = to.Q - from.Q;
+        long deltaR = to.R - from.R;
+        return deltaQ * deltaQ - deltaQ * deltaR + deltaR * deltaR;
     }
 
     /// <inheritdoc />
     public IReadOnlyList<PenguinPosition> GetNeighbors(PenguinPosition position)
     {
         var neighbors = new List<PenguinPosition>(NeighborOffsets.Length);
-        foreach (var (dq, dr) in NeighborOffsets)
+        foreach (var (offsetQ, offsetR) in NeighborOffsets)
         {
-            var q = position.Q + dq;
-            var r = position.R + dr;
+            var q = position.Q + offsetQ;
+            var r = position.R + offsetR;
             if (Contains(q, r))
             {
                 neighbors.Add(new PenguinPosition((ushort)q, (ushort)r));
@@ -99,7 +100,7 @@ public sealed class HexMap : IHexMap
     }
 
     /// <inheritdoc />
-    /// <remarks>Draws from the bounding range and retries cells outside the hexagon.</remarks>
+    /// <remarks>Draws from the bounding Q and R ranges and retries cells outside the hexagon.</remarks>
     public PenguinPosition GetRandomPosition(Random random)
     {
         while (true)
@@ -113,14 +114,19 @@ public sealed class HexMap : IHexMap
         }
     }
 
+    /// <summary>Returns the number of cells in a hexagon with the given side lengths.</summary>
     private static long CountCells(long sideA, long sideB, long sideC)
     {
-        var a = sideA - 1;
-        var b = sideB - 1;
-        var c = sideC - 1;
-        return a * b + b * c + c * a + a + b + c + 1;
+        var edgesA = sideA - 1;
+        var edgesB = sideB - 1;
+        var edgesC = sideC - 1;
+        return edgesA * edgesB + edgesB * edgesC + edgesC * edgesA + edgesA + edgesB + edgesC + 1;
     }
 
+    /// <summary>
+    /// Throws an <see cref="ArgumentOutOfRangeException"/> naming <paramref name="expression"/>
+    /// when <paramref name="largestCoordinate"/> exceeds <see cref="ISimulationEngine.MaxCoordinate"/>.
+    /// </summary>
     private static void ThrowIfCoordinateTooLarge(int largestCoordinate, string expression)
     {
         if (largestCoordinate > ISimulationEngine.MaxCoordinate)

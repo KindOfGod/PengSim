@@ -108,7 +108,7 @@ internal sealed class SimulationDemo(
         switch (choice)
         {
             case MenuChoice.FromParameters:
-                return parameterForm.Read(screen, DemoParameters) is { } parameters
+                return parameterForm.Read(screen) is { } parameters
                     && TryCreateFromParameters(parameters, screen) is { } parametersTime
                     ? (ParametersName, parametersTime)
                     : null;
@@ -211,7 +211,7 @@ internal sealed class SimulationDemo(
     {
         var map = engine.Iterations[0].Map;
         return new DemoProgress(engine.Iterations.Count - 1, totalSteps, totalTime,
-            iterationTime, engine.Penguins.Count, map.SideA, map.SideB, map.SideC, map.CellCount);
+            iterationTime, (ushort)engine.Penguins.Count, map.SideA, map.SideB, map.SideC, map.CellCount);
     }
 
     /// <summary>Runs the action and returns how long it took.</summary>

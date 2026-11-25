@@ -24,7 +24,7 @@ public sealed record SimulationParameters : ISimulationParameters
     public ushort PenguinDistributionSeed { get; init; }
 
     /// <inheritdoc />
-    public required ushort SimulatedSteps { get; init; }
+    public required int SimulatedSteps { get; init; }
 
     /// <inheritdoc />
     /// <remarks>Any angle is accepted and normalized, so -90 becomes 270.</remarks>

@@ -5,7 +5,7 @@ internal readonly record struct DemoProgress(
     int TotalSteps,
     TimeSpan TotalTime,
     TimeSpan IterationTime,
-    int Penguins,
+    ushort Penguins,
     ushort SideA,
     ushort SideB,
     ushort SideC,

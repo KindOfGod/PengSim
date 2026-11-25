@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Numerics;
 using PengSim.BL.Contracts;
 using PengSim.BL.Model.Parameters;
 
@@ -24,13 +25,13 @@ public sealed class SimulationParametersCodec : ISimulationParametersCodec
     {
         string[] segments =
         [
-            UShortToHex(parameters.SideA),
-            UShortToHex(parameters.SideB),
-            UShortToHex(parameters.SideC),
-            UShortToHex(parameters.PenguinPopulation),
-            UShortToHex((ushort)parameters.PenguinDistribution),
-            UShortToHex(parameters.PenguinDistributionSeed),
-            UShortToHex(parameters.SimulatedSteps),
+            IntegerToHex(parameters.SideA),
+            IntegerToHex(parameters.SideB),
+            IntegerToHex(parameters.SideC),
+            IntegerToHex(parameters.PenguinPopulation),
+            IntegerToHex((ushort)parameters.PenguinDistribution),
+            IntegerToHex(parameters.PenguinDistributionSeed),
+            IntegerToHex(parameters.SimulatedSteps),
             FloatToHex(parameters.WindDirectionDegrees),
             FloatToHex(parameters.WindSpeedMetersPerSecond),
             FloatToHex(parameters.TemperatureCelsius),
@@ -56,13 +57,13 @@ public sealed class SimulationParametersCodec : ISimulationParametersCodec
 
         var parameters = new SimulationParameters
         {
-            SideA = HexToUShort(segments[0]),
-            SideB = HexToUShort(segments[1]),
-            SideC = HexToUShort(segments[2]),
-            PenguinPopulation = HexToUShort(segments[3]),
-            PenguinDistribution = (PenguinDistribution)HexToUShort(segments[4]),
-            PenguinDistributionSeed = HexToUShort(segments[5]),
-            SimulatedSteps = HexToUShort(segments[6]),
+            SideA = HexToInteger<ushort>(segments[0]),
+            SideB = HexToInteger<ushort>(segments[1]),
+            SideC = HexToInteger<ushort>(segments[2]),
+            PenguinPopulation = HexToInteger<ushort>(segments[3]),
+            PenguinDistribution = (PenguinDistribution)HexToInteger<ushort>(segments[4]),
+            PenguinDistributionSeed = HexToInteger<ushort>(segments[5]),
+            SimulatedSteps = HexToInteger<int>(segments[6]),
             WindDirectionDegrees = HexToFloat(segments[7]),
             WindSpeedMetersPerSecond = HexToFloat(segments[8]),
             TemperatureCelsius = HexToFloat(segments[9]),
@@ -73,7 +74,7 @@ public sealed class SimulationParametersCodec : ISimulationParametersCodec
     }
 
     /// <summary>Writes a whole number as an uppercase hex number without leading zeros.</summary>
-    private static string UShortToHex(ushort value)
+    private static string IntegerToHex<T>(T value) where T : struct, IBinaryInteger<T>
     {
         return value.ToString("X", CultureInfo.InvariantCulture);
     }
@@ -84,10 +85,10 @@ public sealed class SimulationParametersCodec : ISimulationParametersCodec
         return BitConverter.SingleToUInt32Bits(value).ToString("X", CultureInfo.InvariantCulture);
     }
 
-    /// <summary>Reads a hex segment written by <see cref="UShortToHex"/>.</summary>
-    private static ushort HexToUShort(string segment)
+    /// <summary>Reads a hex segment written by <see cref="IntegerToHex{T}"/>.</summary>
+    private static T HexToInteger<T>(string segment) where T : struct, IBinaryInteger<T>
     {
-        return ushort.Parse(segment, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture);
+        return T.Parse(segment, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture);
     }
 
     /// <summary>Reads a hex segment written by <see cref="FloatToHex"/>.</summary>

@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Numerics;
 using PengSim.BL.Contracts;
 using PengSim.BL.Model;
 using PengSim.BL.Model.Parameters;
@@ -21,11 +22,11 @@ internal sealed class SimulationParameterForm : ISimulationParameterForm
     // The largest coordinates are A + C - 2 and B + C - 2, and both must fit in a ushort.
     private const int MaxSideSum = ushort.MaxValue + 2;
 
-    public ISimulationParameters? Read(IDemoScreen screen, ISimulationParameters defaults)
+    public ISimulationParameters? Read(IDemoScreen screen)
     {
-        if (AskCount(screen, 1, "Maps top and bottom length", defaults.SideA, ushort.MaxValue) is not { } sideA
-            || AskCount(screen, 2, "Maps falling diagonal length", defaults.SideB, ushort.MaxValue) is not { } sideB
-            || AskCount(screen, 3, "Maps rising diagonal length", defaults.SideC, MaxSideC(sideA, sideB)) is not { } sideC)
+        if (AskCount(screen, 1, "Maps top and bottom length", ushort.MaxValue) is not { } sideA
+            || AskCount(screen, 2, "Maps falling diagonal length", ushort.MaxValue) is not { } sideB
+            || AskCount(screen, 3, "Maps rising diagonal length", MaxSideC(sideA, sideB)) is not { } sideC)
         {
             return null;
         }
@@ -33,13 +34,13 @@ internal sealed class SimulationParameterForm : ISimulationParameterForm
         IHexMap map = new HexMap(sideA, sideB, sideC);
         var maxPopulation = (ushort)Math.Min(ushort.MaxValue, map.CellCount);
 
-        if (AskCount(screen, 4, "Number of penguins", defaults.PenguinPopulation, maxPopulation) is not { } population
-            || AskCount(screen, 5, "Steps to simulate", defaults.SimulatedSteps, ushort.MaxValue) is not { } steps
-            || Ask(screen, 6, "Enter an angle in °", defaults.WindDirectionDegrees,
+        if (AskCount(screen, 4, "Number of penguins", maxPopulation) is not { } population
+            || AskCount(screen, 5, "Steps to simulate", int.MaxValue) is not { } steps
+            || Ask<float>(screen, 6, "Enter an angle in °",
                 float.IsFinite, "Enter a number such as 270 or -90.") is not { } windDirection
-            || Ask(screen, 7, "Wind speed in m/s", defaults.WindSpeedMetersPerSecond,
+            || Ask<float>(screen, 7, "Wind speed in m/s",
                 speed => float.IsFinite(speed) && speed >= 0, "Enter a decimal greater or equal than 0.") is not { } windSpeed
-            || Ask(screen, 8, "Temperature in °C", defaults.TemperatureCelsius,
+            || Ask<float>(screen, 8, "Temperature in °C",
                 float.IsFinite, "Enter a number such as -12.5.") is not { } temperature)
         {
             return null;
@@ -67,19 +68,22 @@ internal sealed class SimulationParameterForm : ISimulationParameterForm
     }
 
     /// <summary>Asks for a whole number from 1 to <paramref name="max"/>, showing that range in the prompt.</summary>
-    private static ushort? AskCount(IDemoScreen screen, int fieldNumber, string label, ushort defaultValue, ushort max)
+    private static T? AskCount<T>(
+        IDemoScreen screen, int fieldNumber, string label, T max)
+        where T : struct, INumber<T>
     {
-        return Ask(screen, fieldNumber, $"{label} (1–{max})", Math.Min(defaultValue, max),
-            value => value >= 1 && value <= max, $"Enter a whole number from 1 to {max}.");
+        return Ask<T>(screen, fieldNumber, $"{label} (1–{max})",
+            value => value >= T.One && value <= max, $"Enter a whole number from 1 to {max}.");
     }
 
     /// <summary>Repeats the prompt until the input parses and is allowed, or returns null on Escape.</summary>
     private static T? Ask<T>(
-        IDemoScreen screen, int fieldNumber, string label, T defaultValue, Func<T, bool> isAllowed, string hint)
+        IDemoScreen screen, int fieldNumber, string label, Func<T, bool> isAllowed, string hint)
         where T : struct, IParsable<T>, IFormattable
     {
-        var text = defaultValue.ToString(null, CultureInfo.InvariantCulture);
+        var text = "";
         string? error = null;
+        
         while (true)
         {
             var input = screen.ReadLine($"{Title} ({fieldNumber}/{FieldCount})", label, text, error);

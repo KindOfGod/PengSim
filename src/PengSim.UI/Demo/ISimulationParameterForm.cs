@@ -10,5 +10,5 @@ internal interface ISimulationParameterForm
     /// <paramref name="defaults"/>, and assigns a random placement seed. Returns null
     /// when the user goes back with Escape. The result is not validated yet.
     /// </summary>
-    ISimulationParameters? Read(IDemoScreen screen, ISimulationParameters defaults);
+    ISimulationParameters? Read(IDemoScreen screen);
 }

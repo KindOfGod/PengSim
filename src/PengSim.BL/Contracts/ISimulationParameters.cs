@@ -27,8 +27,8 @@ public interface ISimulationParameters
     /// <summary>Gets the random seed for the initial placement, so the same seed gives the same placement.</summary>
     ushort PenguinDistributionSeed { get; }
 
-    /// <summary>Gets the number of steps to calculate after the initial placement. At least 1.</summary>
-    ushort SimulatedSteps { get; }
+    /// <summary>Gets the number of steps to calculate after the initial placement. Should be at least 1.</summary>
+    int SimulatedSteps { get; }
 
     /// <summary>Gets the direction the wind blows from, in degrees within [0, 360).</summary>
     float WindDirectionDegrees { get; }

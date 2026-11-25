@@ -1,4 +1,4 @@
-using PengSim.BL.Parameters;
+using PengSim.BL.Model.Parameters;
 
 namespace PengSim.BL.Tests;
 
@@ -61,10 +61,25 @@ public sealed class SimulationParametersTests
     [InlineData(360f, 0f)]
     [InlineData(450f, 90f)]
     [InlineData(-720f, 0f)]
+    [InlineData(725f, 5f)]
+    [InlineData(-0.00001f, 0f)]
     public void Wind_direction_is_normalized_to_a_full_turn(float input, float expected)
     {
         var parameters = ValidParameters with { WindDirectionDegrees = input };
 
         Assert.Equal(expected, parameters.WindDirectionDegrees);
+    }
+
+    [Theory]
+    [InlineData(0f)]
+    [InlineData(0.00001f)]
+    [InlineData(1.1f)]
+    [InlineData(270f)]
+    [InlineData(359.99997f)]
+    public void Wind_direction_within_a_full_turn_is_kept_exactly(float angle)
+    {
+        var parameters = ValidParameters with { WindDirectionDegrees = angle };
+
+        Assert.Equal(BitConverter.SingleToUInt32Bits(angle), BitConverter.SingleToUInt32Bits(parameters.WindDirectionDegrees));
     }
 }

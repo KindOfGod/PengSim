@@ -60,9 +60,11 @@ public sealed class HexMapTests
         IHexMap map = new HexMap(a, b, c);
         var steps = new Dictionary<PenguinPosition, int> { [map.Center] = 0 };
         var queue = new Queue<PenguinPosition>([map.Center]);
+        Span<PenguinPosition> buffer = stackalloc PenguinPosition[6];
         while (queue.TryDequeue(out var cell))
         {
-            foreach (var neighbor in map.GetNeighbors(cell))
+            var neighborCount = map.GetNeighbors(cell, buffer);
+            foreach (var neighbor in buffer[..neighborCount])
             {
                 if (steps.TryAdd(neighbor, steps[cell] + 1))
                 {
@@ -79,9 +81,10 @@ public sealed class HexMapTests
     public void Neighbors_are_one_step_and_one_spacing_away()
     {
         IHexMap map = new HexMap(5, 5, 5);
-        var neighbors = map.GetNeighbors(map.Center);
+        Span<PenguinPosition> buffer = stackalloc PenguinPosition[6];
+        var neighbors = buffer[..map.GetNeighbors(map.Center, buffer)].ToArray();
 
-        Assert.Equal(6, neighbors.Count);
+        Assert.Equal(6, neighbors.Length);
         Assert.All(neighbors, neighbor => Assert.Equal(1, map.Distance(map.Center, neighbor)));
         Assert.All(neighbors, neighbor => Assert.Equal(1, map.SquaredEuclideanDistance(map.Center, neighbor)));
     }

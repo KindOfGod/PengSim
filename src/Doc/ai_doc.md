@@ -303,3 +303,11 @@ The renderer now draws any hex with sides A, B, and C, so the form's three side 
 - The camera's staggered offset conversion moved into `MapCamera` and no longer depends on the hex radius. `HexCell.DistanceTo` became unused and was removed.
 - The summary screen shows all three sides. The "Cannot draw this map" screen was removed.
 - Regression check: the redirected overview of the 125/125/125 demo is identical to the output from before the change, once penguin glyphs and the code are normalized.
+
+## Wind direction keeps in-range angles exactly
+
+`SimulationParameters.WindDirectionDegrees` used `(value % 360 + 360) % 360`. The `+ 360` ran for every angle and rounded at the float spacing near 360 (about 0.00003°), so 0.00001 became 0 and 1.1 became 1.1000061. The code then stored the changed value.
+
+- The setter now adds 360 only when the remainder is negative. Float `%` is exact, so angles in [0, 360) are kept bit for bit.
+- A tiny negative angle such as -0.00001 still rounds up to exactly 360 when 360 is added. It is mapped to 0, so the stored angle stays in [0, 360).
+- Tests check that in-range angles keep their exact bits, that 725 and -0.00001 normalize to 5 and 0, and that 0.00001 survives a codec round trip.

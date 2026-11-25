@@ -1,5 +1,6 @@
 using PengSim.BL.Contracts;
-using PengSim.BL.Parameters;
+using PengSim.BL.Model.Parameters;
+using PengSim.BL.Serialization;
 
 namespace PengSim.BL.Tests;
 
@@ -52,6 +53,7 @@ public sealed class SimulationParametersCodecTests
             SimulatedSteps = ushort.MaxValue,
             WindDirectionDegrees = 359.99f,
         },
+        ValidParameters with { WindDirectionDegrees = 0.00001f },
     ];
 
     [Theory]

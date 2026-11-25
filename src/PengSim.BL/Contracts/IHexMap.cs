@@ -51,7 +51,7 @@ public interface IHexMap
     long SquaredEuclideanDistance(PenguinPosition from, PenguinPosition to);
 
     /// <summary>Returns the up to six neighbors of a cell that lie on the map.</summary>
-    IReadOnlyList<PenguinPosition> GetNeighbors(PenguinPosition position);
+    int GetNeighbors(PenguinPosition position, Span<PenguinPosition> neighbors);
 
     /// <summary>Returns a uniformly random cell on the map, drawn from <paramref name="random"/>.</summary>
     PenguinPosition GetRandomPosition(Random random);

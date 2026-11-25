@@ -33,7 +33,9 @@ public sealed class Penguin : IPenguin
         var destination = position;
         var shortestSquaredDistance = long.MaxValue;
 
-        foreach (var neighbor in map.GetNeighbors(position))
+        Span<PenguinPosition> neighbors = stackalloc PenguinPosition[6];
+        var neighborCount = map.GetNeighbors(position, neighbors);
+        foreach (var neighbor in neighbors[..neighborCount])
         {
             if (map.Distance(neighbor, center) >= stepsToCenter || occupied.Contains(neighbor))
             {

@@ -83,20 +83,23 @@ public sealed class HexMap : IHexMap
     }
 
     /// <inheritdoc />
-    public IReadOnlyList<PenguinPosition> GetNeighbors(PenguinPosition position)
+    public int GetNeighbors(PenguinPosition position, Span<PenguinPosition> neighbors)
     {
-        var neighbors = new List<PenguinPosition>(NeighborOffsets.Length);
+        ArgumentOutOfRangeException.ThrowIfLessThan(neighbors.Length, 6, nameof(neighbors));
+
+        var count = 0;
         foreach (var (offsetQ, offsetR) in NeighborOffsets)
         {
             var q = position.Q + offsetQ;
             var r = position.R + offsetR;
             if (Contains(q, r))
             {
-                neighbors.Add(new PenguinPosition((ushort)q, (ushort)r));
+                neighbors[count] = new PenguinPosition((ushort)q, (ushort)r);
+                count++;
             }
         }
 
-        return neighbors;
+        return count;
     }
 
     /// <inheritdoc />

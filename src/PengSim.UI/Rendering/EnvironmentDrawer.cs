@@ -27,7 +27,7 @@ internal sealed class EnvironmentDrawer(
     private const int RedirectedOutputWidth = 101;
     private const int RedirectedOutputHeight = 35;
 
-    public void Show(IReadOnlyList<IEnvironment> frames, HexFootprint footprint, string simulationName)
+    public void Show(IReadOnlyList<ISimulationStep> frames, HexFootprint footprint, string simulationName, string parameterCode)
     {
         var iteration = 0;
         var speed = 0;
@@ -48,7 +48,7 @@ internal sealed class EnvironmentDrawer(
         {
             var preparing = Timestamp();
             var rows = frameRenderer.RenderRows(footprint, heatmap, camera,
-                simulationName, iteration, frames.Count - 1, speed, layout, ansi: presenter is not null);
+                simulationName, parameterCode, iteration, frames.Count - 1, speed, layout, ansi: presenter is not null);
             var ready = Timestamp();
             if (presenter is null)
             {

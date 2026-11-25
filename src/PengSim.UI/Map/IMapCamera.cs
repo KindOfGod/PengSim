@@ -1,5 +1,3 @@
-using PengSim.BL.Model;
-
 namespace PengSim.UI.Map;
 
 /// <summary>Controls the center and zoom level of the map view.</summary>

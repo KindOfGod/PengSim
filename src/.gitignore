@@ -1,3 +1,14 @@
 # .NET build output and intermediate files
 [Bb]in/
 [Oo]bj/
+
+# IDE or code editor folders
+.idea
+.vscode
+.code
+
+# MacOS-specific folders
+.DS_Store
+
+# Rider per-user settings
+*.DotSettings.user

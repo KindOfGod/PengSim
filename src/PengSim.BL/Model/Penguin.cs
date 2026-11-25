@@ -2,60 +2,54 @@ using PengSim.BL.Contracts;
 
 namespace PengSim.BL.Model;
 
-/// <summary>Represents an individual penguin in a simulation.</summary>
+/// <inheritdoc />
 public sealed class Penguin : IPenguin
 {
-    private static readonly (int Q, int R)[] Directions =
-        [(1, 0), (0, 1), (-1, 1), (-1, 0), (0, -1), (1, -1)];
-
+    /// <inheritdoc />
     public ushort Id { get; }
 
+    /// <summary>Creates a penguin with the given ID, starting at 1.</summary>
     internal Penguin(ushort id)
     {
         Id = id;
     }
 
-    PenguinPosition IPenguin.Move(PenguinPosition current, ushort width, ushort height, IReadOnlySet<PenguinPosition> occupied)
+    /// <inheritdoc />
+    PenguinPosition IPenguin.Move(PenguinPosition current, IHexMap map, IReadOnlySet<PenguinPosition> occupied)
     {
-        return MoveTowardCenterForDemo(current, width, height, occupied);
+        return MoveTowardCenterForDemo(current, map, occupied);
     }
 
-    /// <summary>Temporary demo rule: move to an available inward neighbor.</summary>
+    /// <summary>
+    /// Temporary demo rule: among the free neighbors that are fewer steps from the center,
+    /// returns the one with the shortest straight-line distance to it. Returns
+    /// <paramref name="position"/> when no such neighbor exists.
+    /// </summary>
     private static PenguinPosition MoveTowardCenterForDemo(
-        PenguinPosition position, ushort width, ushort height, IReadOnlySet<PenguinPosition> occupied)
+        PenguinPosition position, IHexMap map, IReadOnlySet<PenguinPosition> occupied)
     {
-        var center = HexCell.FromOffset(width / 2, height / 2);
-        var current = HexCell.FromOffset(position.X, position.Y);
-        var distance = current.DistanceTo(center);
+        var center = map.Center;
+        var stepsToCenter = map.Distance(position, center);
         var destination = position;
-        var bestScore = long.MaxValue;
+        var shortestSquaredDistance = long.MaxValue;
 
-        foreach (var (dq, dr) in Directions)
+        Span<PenguinPosition> neighbors = stackalloc PenguinPosition[6];
+        var neighborCount = map.GetNeighbors(position, neighbors);
+        foreach (var neighbor in neighbors[..neighborCount])
         {
-            var neighbor = new HexCell(current.Q + dq, current.R + dr);
-            var row = neighbor.R;
-            var column = neighbor.Q + (row >> 1);
-            if (column < 0 || column >= width || row < 0 || row >= height
-                || neighbor.DistanceTo(center) >= distance)
+            if (map.Distance(neighbor, center) >= stepsToCenter || occupied.Contains(neighbor))
             {
                 continue;
             }
 
-            var candidate = new PenguinPosition((ushort)column, (ushort)row);
-            if (occupied.Contains(candidate))
+            var squaredDistance = map.SquaredEuclideanDistance(neighbor, center);
+            if (squaredDistance >= shortestSquaredDistance)
             {
                 continue;
             }
 
-            // Break ties between shortest hex paths by physical distance to the center.
-            var q = (long)neighbor.Q - center.Q;
-            var r = (long)row - center.R;
-            var score = q * q + q * r + r * r;
-            if (score < bestScore)
-            {
-                bestScore = score;
-                destination = candidate;
-            }
+            shortestSquaredDistance = squaredDistance;
+            destination = neighbor;
         }
 
         return destination;

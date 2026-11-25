@@ -1,44 +1,81 @@
 using PengSim.BL.Contracts;
-using HexCell = PengSim.BL.Model.HexCell;
+using PengSim.BL.Model;
+
 namespace PengSim.UI.Map;
 
-/// <summary>Maps the centered playable hex into the simulation storage grid.</summary>
+/// <summary>
+/// Translates the simulation's hex map into centered drawing coordinates and
+/// describes the region the camera may move in.
+/// </summary>
+/// <remarks>
+/// Map coordinates have their origin at the bottom-left corner and R growing upward.
+/// Drawing coordinates are centered on <see cref="IHexMap.Center"/> and R grows downward,
+/// so the translation only shifts the origin and flips R. The sides may have different lengths.
+/// </remarks>
 internal readonly record struct HexFootprint
 {
-    /// <summary>Gets the width and height of the square storage grid.</summary>
-    public ushort Size { get; }
+    private readonly PenguinPosition _mapCenter;
+    private readonly (ushort A, ushort B, ushort C) _sides;
+    private readonly (int Left, int Right) _screenColumns;
 
-    // A regular hex spans an odd number of cells. Leave one padding row and column on even boards.
-    public int Radius => (Size - 1) / 2;
-    private int Center => Size / 2;
+    /// <summary>Gets the playable cells in drawing coordinates.</summary>
+    public HexRegion Region { get; }
 
-    /// <summary>Gets the playable hex centered on the axial origin.</summary>
-    public HexRegion Region => new(default, Radius);
-
-    public HexFootprint(ushort size)
+    /// <summary>Creates the footprint of <paramref name="map"/>.</summary>
+    /// <remarks>
+    /// The map's bounds translate directly: Q lies in [0, MaxQ], R in [0, MaxR], and the map's
+    /// R - Q in [-(A - 1), B - 1]. Shifting by the center and flipping R gives the ranges below.
+    /// </remarks>
+    public HexFootprint(IHexMap map)
     {
-        ArgumentOutOfRangeException.ThrowIfZero(size);
-        ArgumentOutOfRangeException.ThrowIfGreaterThan(size, ISimulationEngine.MaxDimension);
-        Size = size;
+        _mapCenter = map.Center;
+        _sides = (map.SideA, map.SideB, map.SideC);
+
+        var centerQ = map.Center.Q;
+        var centerR = map.Center.R;
+        var centerQMinusR = centerQ - centerR;
+        Region = new HexRegion(
+            MinQ: -centerQ,
+            MaxQ: map.MaxQ - centerQ,
+            MinR: centerR - map.MaxR,
+            MaxR: centerR,
+            MinS: centerQMinusR - (map.SideA - 1),
+            MaxS: centerQMinusR + (map.SideB - 1));
+        _screenColumns = Region.GetScreenColumns();
     }
 
-    /// <summary>Converts an offset-grid position to centered axial coordinates.</summary>
-    public HexCell ToAxial(int column, int row)
+    /// <summary>Checks whether a simulation map has the shape this footprint draws.</summary>
+    public bool Matches(IHexMap map)
     {
-        return new HexCell(column - Center - (row >> 1) + (Center >> 1), row - Center);
+        return (map.SideA, map.SideB, map.SideC) == _sides;
     }
 
-    /// <summary>Converts a centered axial cell back to an offset-grid position.</summary>
-    public (int Column, int Row) ToOffset(HexCell cell)
+    /// <summary>Converts a simulation map position to centered drawing coordinates.</summary>
+    public HexCell FromMap(PenguinPosition position)
     {
-        var row = cell.R + Center;
-
-        return (cell.Q + Center + (row >> 1) - (Center >> 1), row);
+        return new HexCell(position.Q - _mapCenter.Q, _mapCenter.R - position.R);
     }
 
-    /// <summary>Checks whether a storage-grid position belongs to the playable hex.</summary>
-    public bool Contains(int column, int row)
+    /// <summary>Converts centered drawing coordinates to simulation map coordinates, which may lie off the map.</summary>
+    public (int Q, int R) ToMap(HexCell cell)
     {
-        return Region.Contains(ToAxial(column, row));
+        return (cell.Q + _mapCenter.Q, _mapCenter.R - cell.R);
+    }
+
+    /// <summary>
+    /// Returns the cell closest to <paramref name="cell"/> inside the screen rectangle around
+    /// <see cref="Region"/>. The rectangle's corners lie off the map but stay reachable.
+    /// </summary>
+    public HexCell ClampToBounds(HexCell cell)
+    {
+        var row = Math.Clamp(cell.R, Region.MinR, Region.MaxR);
+        var column = Math.Clamp(2 * cell.Q + cell.R, _screenColumns.Left, _screenColumns.Right);
+        var columnHasCell = ((column - row) & 1) == 0;
+        if (!columnHasCell)
+        {
+            column += column > 0 ? -1 : 1;
+        }
+
+        return new HexCell((column - row) / 2, row);
     }
 }

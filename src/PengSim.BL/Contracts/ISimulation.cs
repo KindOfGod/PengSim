@@ -4,14 +4,20 @@ namespace PengSim.BL.Contracts;
 internal interface ISimulation
 {
     /// <summary>Gets the position snapshots in iteration order, including initial placement at index zero.</summary>
-    IReadOnlyList<IEnvironment> Frames { get; }
+    IReadOnlyList<ISimulationStep> Frames { get; }
 
-    /// <summary>Gets the penguins in this run by occupancy ID.</summary>
+    /// <summary>Gets the validated parameters this run was created from.</summary>
+    ISimulationParameters Parameters { get; }
+
+    /// <summary>Gets the penguins in this run by ID, starting at 1.</summary>
     IReadOnlyDictionary<ushort, IPenguin> Penguins { get; }
 
-    /// <summary>Places a penguin before stepping and returns its assigned ID.</summary>
-    ushort AddPenguin(ushort column, ushort row);
-
-    /// <summary>Runs one turn for each penguin and records the resulting positions.</summary>
+    /// <summary>Moves each penguin once, in ID order, and records the resulting positions as a new frame.</summary>
     void Step();
+
+    /// <summary>
+    /// Calls <see cref="Step"/> until <see cref="ISimulationParameters.SimulatedSteps"/> steps are recorded.
+    /// Steps that were already calculated are kept, so calling it again does nothing.
+    /// </summary>
+    void Exec();
 }

@@ -1,4 +1,3 @@
-using HexCell = PengSim.BL.Model.HexCell;
 namespace PengSim.UI.Map;
 
 /// <summary>
@@ -7,9 +6,11 @@ namespace PengSim.UI.Map;
 /// </summary>
 internal sealed class MapCamera(HexFootprint footprint, IHexGridScale scale) : IMapCamera
 {
+    /// <inheritdoc />
     public HexCell Center { get; private set; }
 
-    /// <summary>Null displays the full overview; L0 displays base hexagons.</summary>
+    /// <inheritdoc />
+    /// <remarks>Null displays the full overview; L0 displays base hexagons.</remarks>
     public int? Level { get; private set; }
 
     /// <summary>
@@ -22,26 +23,28 @@ internal sealed class MapCamera(HexFootprint footprint, IHexGridScale scale) : I
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(steps);
 
         var current = scale.ToLevel(Center, level);
-        var nextRow = current.R + vertical * steps;
-        var nextColumn = current.Q + horizontal * steps + (current.R >> 1) - (nextRow >> 1);
-        var target = scale.ToBase(new HexCell(nextColumn, nextRow), level);
-        MoveToStorage(target);
+        var (column, row) = ToOffset(current);
+        var target = ToAxial(column + horizontal * steps, row + vertical * steps);
+        Center = footprint.ClampToBounds(scale.ToBase(target, level));
     }
 
     /// <summary>
-    /// Moves one base cell. Empty corners of the storage square are valid:
+    /// Moves one base cell. Empty corners of the screen rectangle are valid:
     /// only the hexagonal simulation footprint decides what is playable.
     /// </summary>
     public void PanFine(int horizontal, int vertical)
     {
-        var (column, row) = footprint.ToOffset(Center);
-        var next = footprint.ToAxial(column + horizontal, row + vertical);
-        MoveToStorage(next);
+        var (column, row) = ToOffset(Center);
+        Center = footprint.ClampToBounds(ToAxial(column + horizontal, row + vertical));
     }
 
-    public void ZoomIn(int overviewLevel) =>
+    /// <inheritdoc />
+    public void ZoomIn(int overviewLevel)
+    {
         Level = Math.Max(0, (Level ?? overviewLevel) - 1);
+    }
 
+    /// <inheritdoc />
     public void ZoomOut(int overviewLevel)
     {
         if (Level is not int current)
@@ -59,18 +62,25 @@ internal sealed class MapCamera(HexFootprint footprint, IHexGridScale scale) : I
         }
     }
 
+    /// <inheritdoc />
     public void Reset()
     {
         Center = default;
         Level = null;
     }
 
-    private void MoveToStorage(HexCell requested)
+    /// <summary>
+    /// Converts a cell to staggered offset coordinates, where moving one row up or down keeps
+    /// the column and therefore alternates between the two diagonal neighbors.
+    /// </summary>
+    private static (int Column, int Row) ToOffset(HexCell cell)
     {
-        var (column, row) = footprint.ToOffset(requested);
+        return (cell.Q + (cell.R >> 1), cell.R);
+    }
 
-        column = Math.Clamp(column, 0, footprint.Size - 1);
-        row = Math.Clamp(row, 0, footprint.Size - 1);
-        Center = footprint.ToAxial(column, row);
+    /// <summary>Converts staggered offset coordinates back to a cell; the inverse of <see cref="ToOffset"/>.</summary>
+    private static HexCell ToAxial(int column, int row)
+    {
+        return new HexCell(column - (row >> 1), row);
     }
 }

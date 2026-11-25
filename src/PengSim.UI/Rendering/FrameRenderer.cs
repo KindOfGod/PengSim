@@ -1,4 +1,3 @@
-using HexCell = PengSim.BL.Model.HexCell;
 using PengSim.UI.Map;
 
 namespace PengSim.UI.Rendering;
@@ -15,6 +14,7 @@ internal sealed class FrameRenderer(
     private const uint AccentColor = IHeatmapPalette.Accent;
     private const uint SelectionColor = 0xffd75f;
     private const uint CenterColor = 0xfff0a0;
+    private const string HeaderGap = "    ";
 
     private static readonly (string Key, string Action)[] Shortcuts =
     [
@@ -34,6 +34,7 @@ internal sealed class FrameRenderer(
         IHexHeatmap heatmap,
         IMapCamera camera,
         string simulationName,
+        string parameterCode,
         int iteration,
         int lastIteration,
         int speed,
@@ -47,7 +48,7 @@ internal sealed class FrameRenderer(
 
         var screen = createBuffer(layout.Width, layout.Height);
         screen.Box(0, 0, layout.Width, layout.Height, "Penguin Simulation", OuterColor);
-        screen.Text(2, 1, "Name: " + simulationName,
+        screen.Text(2, 1, $"Name: {simulationName}{HeaderGap}Code: {parameterCode}",
             IHeatmapPalette.DefaultColor, layout.Width - 4);
         screen.Text(2, 2, speed == 0 ? "Paused" : $"Playing at {speed} fps",
             IHeatmapPalette.DefaultColor, layout.Width - 4);
@@ -75,10 +76,10 @@ internal sealed class FrameRenderer(
 
         DrawLegend(screen, layout);
 
-        var (column, row) = footprint.ToOffset(camera.Center);
+        var (q, r) = footprint.ToMap(camera.Center);
         var position = camera.Level.HasValue
-            ? $"Zoom L{level}   ({column}, {row})"
-            : $"Overview L{overview.Level}   ({column}, {row})";
+            ? $"Zoom L{level}   (q {q}, r {r})"
+            : $"Overview L{overview.Level}   (q {q}, r {r})";
         screen.Text(layout.Map.X, iterationPanel.Y + iterationPanel.Height - 2,
             position, IHeatmapPalette.DefaultColor, layout.Map.Width);
         DrawShortcuts(screen, layout);
@@ -158,7 +159,7 @@ internal sealed class FrameRenderer(
             : null;
 
         DrawCells(screen, footprint, heatmap, overviewLevel,
-            minimap.CenteredContent(default), minimap.X + 1, minimap.Y + 1,
+            minimap.CenteredContent(heatmap.GetRegion(overviewLevel).Center), minimap.X + 1, minimap.Y + 1,
             selection, selectedCenter);
     }
 
@@ -168,10 +169,10 @@ internal sealed class FrameRenderer(
     {
         screen.Box(panel.X, panel.Y, panel.Width, panel.Height,
             "Information", PanelColor);
-        var (column, row) = footprint.ToOffset(camera.Center);
+        var (q, r) = footprint.ToMap(camera.Center);
         var lines = new[]
         {
-            $"Center: ({column},{row})",
+            $"Center: q {q}, r {r}",
             camera.Level.HasValue
                 ? $"Detail L{level} / overview L{overviewLevel}"
                 : $"Full overview L{overviewLevel}",
@@ -198,6 +199,7 @@ internal sealed class FrameRenderer(
         MinimapViewport? selection, HexCell? cameraCenter)
     {
         var world = level == 0 ? footprint.Region : heatmap.GetRegion(level);
+        var worldWithBorder = world.Expand(1);
 
         for (var y = 0; y < bounds.Height; y++)
         {
@@ -210,7 +212,7 @@ internal sealed class FrameRenderer(
             {
                 var mapX = bounds.Left + x;
                 var cell = new HexCell((mapX - row) / 2, row);
-                var paint = GetCellPaint(heatmap, world, level, cell);
+                var paint = GetCellPaint(heatmap, world, worldWithBorder, level, cell);
 
                 if (cameraCenter is { } center && cell == center)
                 {
@@ -228,21 +230,20 @@ internal sealed class FrameRenderer(
 
     /// <summary>
     /// L0 reads the selected frame’s occupied cells. Coarser hex cells use the
-    /// sparse aggregate index. Only cells at distance R+1 from the *world*
-    /// center get the teal border; the camera perimeter never gets it.
+    /// sparse aggregate index. Only the ring of cells just outside the *world*
+    /// gets the teal border; the camera perimeter never gets it.
     /// </summary>
     private TerminalPixel GetCellPaint(
         IHexHeatmap heatmap,
-        HexRegion world, int level, HexCell cell)
+        HexRegion world, HexRegion worldWithBorder, int level, HexCell cell)
     {
-        var distance = cell.DistanceTo(world.Center);
-        if (distance <= world.Radius)
+        if (world.Contains(cell))
         {
             var population = heatmap.GetPopulation(level, cell);
             return palette.GetDensityPaint(population);
         }
 
-        return distance == world.Radius + 1
+        return worldWithBorder.Contains(cell)
             ? palette.WorldEdgePaint
             : palette.OutsidePaint;
     }

@@ -214,3 +214,109 @@ The demo now places 1,000 penguins. At four bytes per position, the initial fram
 ## 250 × 250 demo and playback controls
 
 The demo places 500 penguins on a 250 × 250 grid and records 1,000 steps. The 1,001 frames contain 2,002,000 bytes of coordinates. The temporary M shortcut has been removed. Keys 1–9 select playback speed and 0 pauses.
+
+## Parameter-based demo setup
+
+The demo now builds an `ISimulationParameters` instance and passes it to `CreateSimulation`, so the engine handles placement instead of the UI. The parameters use three equal sides of 125 cells because the renderer and heatmap only draw regular hexes. `GridDimensions` gives a 249 × 249 board. The UI's `HexFootprint` centers the same radius-124 hex on that board, so both layers use the same cells. If the sides differ, the UI throws at startup instead of drawing the wrong shape.
+
+## Start menu with three simulation sources
+
+The main menu now offers [1] Simulation from parameters, [2] Simulation from code, and [3] Demo simulation. All three produce an `ISimulationParameters` and use the same steps after that: validate, build the footprint, generate, show the summary, and analyze. The step count now comes from `SimulatedSteps` instead of a demo constant.
+
+- `SimulationParameterForm` asks for one field per prompt, pre-filled with the demo values, and repeats a prompt until the input parses. It does not ask for the placement seed: the UI sets a random seed when it builds the parameters, because users want new layouts rather than to choose a seed. The code shown in the analysis view keeps the seed, so a run can still be reproduced. It does not ask for the distribution because only Uniform exists.
+- The form now asks for all three side lengths (eight fields in total), and every prompt shows its allowed range. A prompt repeats until the value is within that range, so mistakes are caught at the field instead of after the whole form. Side C allows at most 65537 − max(A, B), which keeps A + C − 2 and B + C − 2 within `ushort`. The population allows at most the map's cell count, capped at 65535. Prefilled defaults are clamped to these limits. Wind speed must be 0 or more, and all decimals must be finite. Unequal sides pass the form but are still rejected by `HexFootprint`, because the renderer only draws regular hexes.
+- The code option decodes through `ISimulationParametersCodec`, which is now registered in the UI container. An invalid code keeps the prompt open and shows an error.
+- `Validate()` failures are shown on an error screen, followed by a return to the menu. So are boards wider than `MaxDimension`, which would otherwise wrap when converted to `ushort`, and hexes with unequal sides.
+- `DemoScreen` gained a line-input prompt and an error screen. Its key loop is shared, so every screen redraws on resize. Escape in any prompt returns to the menu.
+- Redirected runs skip the menu and render the demo overview as before.
+
+## Parameter code in the analysis view
+
+The analysis header now shows the run's parameter code next to its name: `Name: … Code: …`. Pasting it into Simulation from code recreates the same run. This works because placement is seeded and the codec stores floats by their raw bits. A temporary engine test confirmed that a decoded code gives the same frame zero and the same later frames. The header row was chosen because it has almost the full terminal width, while codes are 30–60 characters long and would be clipped in the Information panel. `IEnvironmentDrawer.Show` and `IFrameRenderer.RenderRows` take the code as an extra string argument. The UI encodes the code with `ISimulationParametersCodec` before opening the view.
+
+The README now documents the parameter model, the `GridDimensions` formula, the code format, engine-side seeded placement, the 65,535 limits, and `null` for empty cells. Before, it still described `AddPenguin`, a 65,000 limit, and zero as the empty-cell value.
+
+## Hex coordinates throughout the BL
+
+The BL no longer uses offset or Cartesian coordinates. Before, positions were offset column/row pairs on the rectangle around the hexagon. Each penguin move converted them to axial and back, and the inside check, `GridDimensions`, and row-parity rules all existed only because of that rectangle.
+
+- `PenguinPosition` is now `(ushort Q, ushort R)` and still takes 4 bytes. The origin is the hexagon's bottom-left corner. R counts rows upward, and Q counts the top-left-to-bottom-right diagonals to the right. This origin keeps every coordinate non-negative, so storage stays `ushort` without sign handling. Neighbors are (±1, 0), (0, ±1), and ±(1, 1).
+- The new `IHexMap` / `HexMap` owns all geometry:
+  - side lengths, `MaxQ` (A + C − 2) and `MaxR` (B + C − 2)
+  - `CellCount`, which uses `long` because the old `int` formula overflowed for large sides
+  - `Center`: the hexagon is point-symmetric, so its center is (MaxQ / 2, MaxR / 2), rounded down
+  - `Contains`: three range checks, one for each pair of opposite sides
+  - `Distance`: max(|Δq|, |Δr|, |Δq − Δr|)
+  - `SquaredEuclideanDistance`: Δq² − ΔqΔr + Δr², which the movement rule uses to break ties
+  - `GetNeighbors` and seeded `GetRandomPosition`
+- `HexMapTests` check all of this against brute force for every side combination from 1 to 6. That covers the cell count, side lengths, corners, the center, and breadth-first distances.
+- `IEnvironment` exposes `Map` instead of `Width`/`Height`. Its indexer takes a `PenguinPosition`. `IPenguin.Move` receives the map instead of a width and height. `ISimulationParameters.GridDimensions` has been removed.
+- `SimulationParameters.Validate` builds a `HexMap`, which checks the side lengths and the new coordinate limit. `ISimulationEngine.MaxDimension` became `MaxCoordinate`.
+- `Simulation`'s two constructors now share one private constructor, so the setup is no longer duplicated.
+- `HexCell` moved to the UI (`PengSim.UI.Map`) because only drawing code still uses it. `HexFootprint` is built from an `IHexMap` and converts map positions to centered drawing coordinates. This conversion only shifts the origin and flips R. The camera's square screen grid stays in the UI as a display concern. The UI shows the camera center in map coordinates (q, r). The summary shows the map side and cell count instead of a grid size.
+
+## Fast run or progress bar
+
+After a simulation is chosen and validated, the UI asks how to calculate it: Enter runs all steps at once with `ISimulationEngine.Exec()`, and P runs them one at a time with `Step()` and the progress bar, as before. Escape goes back to the menu. The fast mode only shows a static "Calculating all steps…" panel, so it skips the progress redraws and the per-step stopwatch reads. Redirected runs always use the fast mode. The summary screen after the run shows the same timings in both modes, so the two can be compared.
+
+## BL documentation and readability pass
+
+Inline comments in the BL were replaced with descriptive names (for example `isBetweenSidesA`, `stepsToCenter`, `previousPositions`) or moved into `<remarks>`. Every type, member, and field now has a doc comment, and implementations use `<inheritdoc />`. Several doc comments were wrong and have been corrected:
+
+- The codec's remarks described a fixed-point float format with `FixedPointScale` and `SignedOffset`, and an optional seed. None of these exist: floats are stored as their raw IEEE 754 bits. The remarks now describe the real format.
+- `CreateSimulation(string)` claimed to return "the created simulation object". It returns the engine.
+- `IPenguin.Id` mentioned an occupancy grid that no longer exists. It now says the ID is the 1-based index into each step's positions.
+- `SimulationParameters` said it was "typically read from JSON". It is entered in the UI or decoded from a code. An unused `System.Text.Json` using was removed.
+
+Small code changes made along the way:
+
+- The codec no longer maps the wind direction to (-180, 180] before encoding. That only mattered for the old fixed-point range, and with raw bits it could add rounding errors. Old codes still decode the same way.
+- `Decode` now requires exactly ten segments instead of at least ten, so codes with trailing extra segments are rejected.
+- `Simulation` dropped the unused `SimulationCode` property and the private constructor that existed only for it. `Parameters` is now a private field.
+- `SimulationEngine.Step` and `Exec` share a guard helper that uses braces, as the repository conventions require.
+
+## Clearer code errors, printed code, and parameter tests
+
+- The code prompt now shows the exception message from `Decode` instead of a generic text, such as the expected segment count or which value is out of range. `DemoScreen` wraps long errors over several lines so they are not cut off at the panel edge.
+- After the app exits, the code of the generated run is printed to the normal terminal, so it can be copied after the alternate screen closes. The analysis header still shows it as well. Nothing is printed when the user quits from the menu without generating a run.
+- `ISimulationEngine.CreateSimulation(string code)` stays, even though the UI decodes codes itself. Future modules will connect to the engine and start runs from codes.
+- New tests cover the codec (wrong segment count, empty code, non-hex segments, values that overflow a `ushort`, NaN floats, a side of 0, an unknown distribution, normalizing a negative wind direction, and round trips of the demo and boundary parameters) and `SimulationParameters.Validate` (each rule, plus a population that fills every cell).
+- The README now describes the three-side form, the range hints, the Enter/P run choice, and the printed code.
+
+## The UI creates simulations through the engine
+
+The code menu entry now passes the pasted code straight to `ISimulationEngine.CreateSimulation(string)` instead of decoding it in the UI. This uses the same entry point that future modules will use. The parameter form and the demo still call `CreateSimulation(ISimulationParameters)`.
+
+- `ISimulationEngine` gained `Parameters`, the validated parameters of the active run, or null before creation. The UI reads the step count and the code it displays from there, so the shown code always describes the run that was calculated.
+- The simulation is now created right after the menu choice, before the Enter/P run-mode prompt. Invalid parameters or codes are caught at that point. The footprint is built from `engine.Iterations[0].Map`, and unequal sides are reported on a "Cannot draw this map" screen.
+- Creation time is still counted in the "Elapsed" total, but is now measured separately and added to the step time.
+
+## Hexes with unequal sides
+
+The renderer now draws any hex with sides A, B, and C, so the form's three side lengths and codes with unequal sides run instead of ending on an error screen.
+
+- `HexRegion` changed from a center and radius to a range for each of Q, R, and S = −Q − R. Every hexagon whose opposite sides are equal is exactly such a set, and a regular hex of radius n has all three ranges at [−n, n]. The region provides containment, a one-cell expansion, the cells of a row, and the screen column range.
+- `HexFootprint` builds the region straight from the `IHexMap` bounds: Q in [0, MaxQ], R in [0, MaxR], and the map's R − Q in [−(A − 1), B − 1], shifted by the center and with R flipped. The equal-sides check and the square storage grid were removed. `ClampToBounds` keeps the camera inside the screen rectangle around the region.
+- `HexHeatmap` measures each zoom level's region by converting the perimeter cells (both ends of every row, and the full top and bottom rows) with `ToLevel` and taking the ranges. The old radius only scanned row ends; the full top and bottom rows were added because the cube-rounding correction can shift R inside a row. `FitWorld` now takes a column and row budget instead of a radius. Each level caches its column width, so the per-frame overview fit does not loop over rows.
+- The aggregation lattice stays anchored at the map center. That hexagon is point-symmetric even with unequal sides, so opposite sides get the same padding at coarse levels. A corner anchor (or 7-cell clusters) was considered: neither makes a side exact, because hex buckets have zigzag edges, and 7-cell clusters would also rotate the lattice by about 19° per level.
+- The world border is now "inside the region expanded by one cell, but outside the region". For regular hexes this is the same as the old "distance == R + 1".
+- The camera's staggered offset conversion moved into `MapCamera` and no longer depends on the hex radius. `HexCell.DistanceTo` became unused and was removed.
+- The summary screen shows all three sides. The "Cannot draw this map" screen was removed.
+- Regression check: the redirected overview of the 125/125/125 demo is identical to the output from before the change, once penguin glyphs and the code are normalized.
+
+## Wind direction keeps in-range angles exactly
+
+`SimulationParameters.WindDirectionDegrees` used `(value % 360 + 360) % 360`. The `+ 360` ran for every angle and rounded at the float spacing near 360 (about 0.00003°), so 0.00001 became 0 and 1.1 became 1.1000061. The code then stored the changed value.
+
+- The setter now adds 360 only when the remainder is negative. Float `%` is exact, so angles in [0, 360) are kept bit for bit.
+- A tiny negative angle such as -0.00001 still rounds up to exactly 360 when 360 is added. It is mapped to 0, so the stored angle stays in [0, 360).
+- Tests check that in-range angles keep their exact bits, that 725 and -0.00001 normalize to 5 and 0, and that 0.00001 survives a codec round trip.
+
+## Shared run workflow moved out of Demo
+
+Parameter runs, replay codes, and the built-in demo all go through the same menu, run-mode prompt, progress screen, and analysis view, but the workflow lived in `Demo/` with demo-prefixed names.
+
+- The workflow moved to `Session/` (`PengSim.UI.Session`): `MenuChoice`, `RunMode`, the parameter form, the screen, the progress record, and the orchestration.
+- Types that serve every run were renamed: `SimulationDemo` → `SimulationSession`, `DemoScreen` → `SessionScreen`, `DemoProgress` → `RunProgress`, with their interfaces.
+- The demo parameters and name moved from the session into the static `Demo/DemoPreset`, the only demo-specific piece. `MenuChoice.Demo` and the menu text keep the word, because that entry is the demo.
+- Behavior is unchanged.

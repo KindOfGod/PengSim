@@ -1,5 +1,4 @@
 using PengSim.BL.Contracts;
-using PengSim.BL.Model;
 
 namespace PengSim.UI.Map;
 
@@ -7,7 +6,7 @@ namespace PengSim.UI.Map;
 internal interface IHexHeatmap
 {
     /// <summary>Recounts occupied cells for the supplied iteration.</summary>
-    void Rebuild(IEnvironment environment);
+    void Rebuild(ISimulationStep simulationStep);
 
     /// <summary>Gets the population in a bucket at the given zoom level.</summary>
     int GetPopulation(int zoom, HexCell cell);
@@ -15,6 +14,9 @@ internal interface IHexHeatmap
     /// <summary>Gets the enclosing hex region at the given aggregate zoom level.</summary>
     HexRegion GetRegion(int zoom);
 
-    /// <summary>Chooses the finest aggregate level whose world fits within the requested radius.</summary>
-    (int Level, HexRegion Region) FitWorld(int maxRadius);
+    /// <summary>
+    /// Chooses the finest aggregate level whose world spans at most <paramref name="maxColumns"/>
+    /// screen columns and <paramref name="maxRows"/> rows, and returns it with its region.
+    /// </summary>
+    (int Level, HexRegion Region) FitWorld(int maxColumns, int maxRows);
 }

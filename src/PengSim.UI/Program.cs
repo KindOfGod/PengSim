@@ -1,8 +1,10 @@
 using Autofac;
 using PengSim.BL;
-using PengSim.UI.Demo;
+using PengSim.BL.Contracts;
+using PengSim.BL.Serialization;
 using PengSim.UI.Map;
 using PengSim.UI.Rendering;
+using PengSim.UI.Session;
 
 var builder = new ContainerBuilder();
 builder.RegisterModule<SimulationModule>();
@@ -15,8 +17,10 @@ builder.RegisterType<FrameRenderer>().As<IFrameRenderer>();
 builder.RegisterType<EnvironmentDrawer>().As<IEnvironmentDrawer>();
 // Each terminal session disposes its screen and presenter when it exits.
 builder.RegisterType<TerminalPresenter>().As<ITerminalPresenter>().ExternallyOwned();
-builder.RegisterType<DemoScreen>().As<IDemoScreen>().ExternallyOwned();
-builder.RegisterType<SimulationDemo>().As<ISimulationDemo>();
+builder.RegisterType<SessionScreen>().As<ISessionScreen>().ExternallyOwned();
+builder.RegisterType<SimulationParametersCodec>().As<ISimulationParametersCodec>();
+builder.RegisterType<SimulationParameterForm>().As<ISimulationParameterForm>();
+builder.RegisterType<SimulationSession>().As<ISimulationSession>();
 
 using var container = builder.Build();
-container.Resolve<ISimulationDemo>().Run();
+container.Resolve<ISimulationSession>().Run();

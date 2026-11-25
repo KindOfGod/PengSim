@@ -311,3 +311,12 @@ The renderer now draws any hex with sides A, B, and C, so the form's three side 
 - The setter now adds 360 only when the remainder is negative. Float `%` is exact, so angles in [0, 360) are kept bit for bit.
 - A tiny negative angle such as -0.00001 still rounds up to exactly 360 when 360 is added. It is mapped to 0, so the stored angle stays in [0, 360).
 - Tests check that in-range angles keep their exact bits, that 725 and -0.00001 normalize to 5 and 0, and that 0.00001 survives a codec round trip.
+
+## Shared run workflow moved out of Demo
+
+Parameter runs, replay codes, and the built-in demo all go through the same menu, run-mode prompt, progress screen, and analysis view, but the workflow lived in `Demo/` with demo-prefixed names.
+
+- The workflow moved to `Session/` (`PengSim.UI.Session`): `MenuChoice`, `RunMode`, the parameter form, the screen, the progress record, and the orchestration.
+- Types that serve every run were renamed: `SimulationDemo` → `SimulationSession`, `DemoScreen` → `SessionScreen`, `DemoProgress` → `RunProgress`, with their interfaces.
+- The demo parameters and name moved from the session into the static `Demo/DemoPreset`, the only demo-specific piece. `MenuChoice.Demo` and the menu text keep the word, because that entry is the demo.
+- Behavior is unchanged.

@@ -1,7 +1,7 @@
-namespace PengSim.UI.Demo;
+namespace PengSim.UI.Session;
 
 /// <summary>Displays the menus, text prompts, and generation progress.</summary>
-internal interface IDemoScreen : IDisposable
+internal interface ISessionScreen : IDisposable
 {
     /// <summary>Shows the main menu and returns the chosen entry, or null when the user quits.</summary>
     MenuChoice? WaitForMenuChoice();
@@ -26,8 +26,8 @@ internal interface IDemoScreen : IDisposable
     void ShowRunning();
 
     /// <summary>Displays the latest generation progress and timings.</summary>
-    void ShowProgress(DemoProgress progress);
+    void ShowProgress(RunProgress progress);
 
     /// <summary>Shows the completed run and returns true when the user chooses Analyze.</summary>
-    bool WaitForAnalysis(DemoProgress result);
+    bool WaitForAnalysis(RunProgress result);
 }

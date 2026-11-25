@@ -1,4 +1,4 @@
-namespace PengSim.UI.Demo;
+namespace PengSim.UI.Session;
 
 /// <summary>An entry the user can pick in the main menu.</summary>
 internal enum MenuChoice

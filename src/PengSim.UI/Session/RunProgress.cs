@@ -1,6 +1,6 @@
-namespace PengSim.UI.Demo;
+namespace PengSim.UI.Session;
 
-internal readonly record struct DemoProgress(
+internal readonly record struct RunProgress(
     int CompletedSteps,
     int TotalSteps,
     TimeSpan TotalTime,

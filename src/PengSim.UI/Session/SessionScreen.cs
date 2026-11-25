@@ -1,9 +1,9 @@
 using System.Text;
 using PengSim.UI.Rendering;
 
-namespace PengSim.UI.Demo;
+namespace PengSim.UI.Session;
 
-internal sealed class DemoScreen : IDemoScreen
+internal sealed class SessionScreen : ISessionScreen
 {
     private const int ProgressBarWidth = 22;
     private const int MaxPanelWidth = 54;
@@ -18,7 +18,7 @@ internal sealed class DemoScreen : IDemoScreen
     private readonly ITerminalPresenter _presenter;
     private readonly CreateTerminalBuffer _createBuffer;
 
-    public DemoScreen(ITerminalPresenter presenter, CreateTerminalBuffer createBuffer)
+    public SessionScreen(ITerminalPresenter presenter, CreateTerminalBuffer createBuffer)
     {
         _presenter = presenter;
         _createBuffer = createBuffer;
@@ -120,12 +120,12 @@ internal sealed class DemoScreen : IDemoScreen
         Draw("Generating simulation", ("Calculating all steps…", Normal));
     }
 
-    public void ShowProgress(DemoProgress progress)
+    public void ShowProgress(RunProgress progress)
     {
         DrawProgress(progress, "Generating simulation", "Calculating steps…");
     }
 
-    public bool WaitForAnalysis(DemoProgress result)
+    public bool WaitForAnalysis(RunProgress result)
     {
         return WaitFor('A', () => DrawProgress(result, "Simulation complete", "[A] Analyze    [Q] Quit"));
     }
@@ -162,7 +162,7 @@ internal sealed class DemoScreen : IDemoScreen
         Draw(title, lines.ToArray());
     }
 
-    private void DrawProgress(DemoProgress progress, string title, string footer)
+    private void DrawProgress(RunProgress progress, string title, string footer)
     {
         var filled = ProgressBarWidth * progress.CompletedSteps / progress.TotalSteps;
         var bar = new string('█', filled) + new string('░', ProgressBarWidth - filled);

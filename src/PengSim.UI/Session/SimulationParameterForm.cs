@@ -4,7 +4,7 @@ using PengSim.BL.Contracts;
 using PengSim.BL.Model;
 using PengSim.BL.Model.Parameters;
 
-namespace PengSim.UI.Demo;
+namespace PengSim.UI.Session;
 
 /// <remarks>
 /// Each prompt shows its allowed range and repeats until the input is within it.
@@ -22,7 +22,7 @@ internal sealed class SimulationParameterForm : ISimulationParameterForm
     // The largest coordinates are A + C - 2 and B + C - 2, and both must fit in a ushort.
     private const int MaxSideSum = ushort.MaxValue + 2;
 
-    public ISimulationParameters? Read(IDemoScreen screen)
+    public ISimulationParameters? Read(ISessionScreen screen)
     {
         if (AskCount(screen, 1, "Maps top and bottom length", ushort.MaxValue) is not { } sideA
             || AskCount(screen, 2, "Maps falling diagonal length", ushort.MaxValue) is not { } sideB
@@ -69,7 +69,7 @@ internal sealed class SimulationParameterForm : ISimulationParameterForm
 
     /// <summary>Asks for a whole number from 1 to <paramref name="max"/>, showing that range in the prompt.</summary>
     private static T? AskCount<T>(
-        IDemoScreen screen, int fieldNumber, string label, T max)
+        ISessionScreen screen, int fieldNumber, string label, T max)
         where T : struct, INumber<T>
     {
         return Ask<T>(screen, fieldNumber, $"{label} (1–{max})",
@@ -78,7 +78,7 @@ internal sealed class SimulationParameterForm : ISimulationParameterForm
 
     /// <summary>Repeats the prompt until the input parses and is allowed, or returns null on Escape.</summary>
     private static T? Ask<T>(
-        IDemoScreen screen, int fieldNumber, string label, Func<T, bool> isAllowed, string hint)
+        ISessionScreen screen, int fieldNumber, string label, Func<T, bool> isAllowed, string hint)
         where T : struct, IParsable<T>, IFormattable
     {
         var text = "";

@@ -1,4 +1,4 @@
-namespace PengSim.UI.Demo;
+namespace PengSim.UI.Session;
 
 /// <summary>How the chosen simulation is calculated before the analysis view opens.</summary>
 internal enum RunMode

@@ -9,3 +9,6 @@
 
 # MacOS-specific folders
 .DS_Store
+
+# Rider per-user settings
+*.DotSettings.user

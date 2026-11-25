@@ -100,13 +100,37 @@ public sealed class HexMap : IHexMap
     }
 
     /// <inheritdoc />
-    /// <remarks>Draws from the bounding Q and R ranges and retries cells outside the hexagon.</remarks>
+    /// <remarks>
+    /// Draws from the two narrowest of the q, r and r - q ranges and retries cells outside the hexagon.
+    /// At least 75% of the draws hit the map in worst case.
+    /// </remarks>
     public PenguinPosition GetRandomPosition(Random random)
     {
+        var qWidth = MaxQ + 1;
+        var rWidth = MaxR + 1;
+        var dWidth = SideA + SideB - 1;
+
         while (true)
         {
-            var q = random.Next(MaxQ + 1);
-            var r = random.Next(MaxR + 1);
+            int q;
+            int r;
+            
+            if (dWidth >= qWidth && dWidth >= rWidth)
+            {
+                q = random.Next(qWidth);
+                r = random.Next(rWidth);
+            }
+            else if (qWidth >= rWidth)
+            {
+                r = random.Next(rWidth);
+                q = r - random.Next(-(SideA - 1), SideB);
+            }
+            else
+            {
+                q = random.Next(qWidth);
+                r = q + random.Next(-(SideA - 1), SideB);
+            }
+
             if (Contains(q, r))
             {
                 return new PenguinPosition((ushort)q, (ushort)r);

@@ -1,7 +1,7 @@
 using System.Globalization;
 using PengSim.BL.Contracts;
 using PengSim.BL.Model;
-using PengSim.BL.Parameters;
+using PengSim.BL.Model.Parameters;
 
 namespace PengSim.UI.Demo;
 

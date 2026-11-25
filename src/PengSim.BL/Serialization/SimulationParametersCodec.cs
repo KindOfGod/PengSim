@@ -1,7 +1,8 @@
 using System.Globalization;
 using PengSim.BL.Contracts;
+using PengSim.BL.Model.Parameters;
 
-namespace PengSim.BL.Parameters;
+namespace PengSim.BL.Serialization;
 
 /// <inheritdoc />
 /// <remarks>

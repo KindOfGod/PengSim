@@ -1,4 +1,4 @@
-namespace PengSim.BL.Parameters;
+namespace PengSim.BL.Model.Parameters;
 
 /// <summary>How penguins are placed on the map before the first iteration.</summary>
 public enum PenguinDistribution

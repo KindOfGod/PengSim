@@ -1,4 +1,4 @@
-using PengSim.BL.Parameters;
+using PengSim.BL.Model.Parameters;
 
 namespace PengSim.BL.Contracts;
 

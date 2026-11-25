@@ -1,7 +1,7 @@
 using Autofac;
 using PengSim.BL;
 using PengSim.BL.Contracts;
-using PengSim.BL.Parameters;
+using PengSim.BL.Serialization;
 using PengSim.UI.Demo;
 using PengSim.UI.Map;
 using PengSim.UI.Rendering;

@@ -1,6 +1,6 @@
 using System.Diagnostics;
 using PengSim.BL.Contracts;
-using PengSim.BL.Parameters;
+using PengSim.BL.Model.Parameters;
 using PengSim.UI.Map;
 using PengSim.UI.Rendering;
 

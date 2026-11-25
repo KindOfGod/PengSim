@@ -1,7 +1,6 @@
 using PengSim.BL.Contracts;
-using PengSim.BL.Model;
 
-namespace PengSim.BL.Parameters;
+namespace PengSim.BL.Model.Parameters;
 
 /// <summary>Immutable simulation parameters, entered in the UI or decoded from a parameter code.</summary>
 public sealed record SimulationParameters : ISimulationParameters

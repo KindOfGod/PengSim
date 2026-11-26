@@ -7,44 +7,57 @@ namespace PengSim.UI.Map;
 /// </summary>
 internal sealed class HexGridScale : IHexGridScale
 {
-    /// <summary>
-    /// Rounds a base-level hex to its nearest hex center on a coarser,
-    /// axis-aligned lattice. Deterministic cube-coordinate rounding assigns
-    /// each base cell to exactly one display bucket.
-    /// </summary>
+    /// <inheritdoc />
     public HexCell ToLevel(HexCell cell, int level)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(level);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(level, 30);
 
-        var scale = (double)(1L << level);
-        var q = cell.Q / scale;
-        var r = cell.R / scale;
-        var s = -q - r;
-
-        // Cube coordinates obey q + r + s = 0. Independently rounding all
-        // three axes could break that invariant, so correct the coordinate
-        // with the largest rounding error after taking rounded values.
-        var rq = Math.Round(q, MidpointRounding.AwayFromZero);
-        var rr = Math.Round(r, MidpointRounding.AwayFromZero);
-        var rs = Math.Round(s, MidpointRounding.AwayFromZero);
-
-        var dq = Math.Abs(rq - q);
-        var dr = Math.Abs(rr - r);
-        var ds = Math.Abs(rs - s);
-
-        // Deterministic tie-breaking ensures every base hex maps to exactly
-        // one bucket, even on boundaries between two coarse hex centers.
-        if (dq > dr && dq > ds)
+        if (level == 0)
         {
-            rq = -rr - rs;
-        }
-        else if (dr > ds)
-        {
-            rr = -rq - rs;
+            return cell;
         }
 
-        return new HexCell((int)rq, (int)rr);
+        var scale = 1L << level;
+        // The nearest center's Q and R lie at the floor or ceiling of each scaled
+        // coordinate. Right shift gives the floor, including for negative coordinates.
+        var minQ = cell.Q >> level;
+        var minR = cell.R >> level;
+        var nearestDistance = long.MaxValue;
+        var nearestRadius = long.MaxValue;
+        var nearestTurn = long.MinValue;
+        var nearest = default(HexCell);
+
+        for (var q = minQ; q <= minQ + 1; q++)
+        {
+            for (var r = minR; r <= minR + 1; r++)
+            {
+                var deltaQ = cell.Q - q * scale;
+                var deltaR = cell.R - r * scale;
+                var distance = deltaQ * deltaQ + deltaQ * deltaR + deltaR * deltaR;
+                if (distance > nearestDistance)
+                {
+                    continue;
+                }
+
+                var radius = Math.Max(Math.Max(Math.Abs(q), Math.Abs(r)), Math.Abs((long)q + r));
+                // Equal-distance centers on the same ring are ordered by their signed
+                // turn around the origin. The cross product keeps that order under rotation.
+                var turn = (long)q * cell.R - (long)r * cell.Q;
+                if (distance == nearestDistance &&
+                    (radius > nearestRadius || (radius == nearestRadius && turn <= nearestTurn)))
+                {
+                    continue;
+                }
+
+                nearest = new HexCell(q, r);
+                nearestDistance = distance;
+                nearestRadius = radius;
+                nearestTurn = turn;
+            }
+        }
+
+        return nearest;
     }
 
     /// <summary>Returns the base-cell coordinate at a display bucket's center.</summary>

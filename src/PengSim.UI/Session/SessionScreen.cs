@@ -127,7 +127,18 @@ internal sealed class SessionScreen : ISessionScreen
 
     public bool WaitForAnalysis(RunProgress result)
     {
-        return WaitFor('A', () => DrawProgress(result, "Simulation complete", "[A] Analyze    [Q] Quit"));
+        while (true)
+        {
+            var key = ReadKey(() => DrawProgress(result, "Simulation complete", "[Enter] Analyze    [Q] Quit"));
+            if (key.Key == ConsoleKey.Q)
+            {
+                return false;
+            }
+            if (key.Key is ConsoleKey.Enter or ConsoleKey.A)
+            {
+                return true;
+            }
+        }
     }
 
     public void Dispose()
@@ -197,22 +208,6 @@ internal sealed class SessionScreen : ISessionScreen
             buffer.Text(x + 2, y + 1 + i, lines[i].Text, lines[i].Color, panelWidth - PanelPadding);
         }
         _presenter.Present(buffer.ToAnsiRows(true), width, height);
-    }
-
-    private static bool WaitFor(char shortcut, Action draw)
-    {
-        while (true)
-        {
-            var key = ReadKey(draw);
-            if (key.Key == ConsoleKey.Q)
-            {
-                return false;
-            }
-            if (char.ToUpperInvariant(key.KeyChar) == shortcut)
-            {
-                return true;
-            }
-        }
     }
 
     /// <summary>Draws once, redraws on terminal resize, and returns the next key press.</summary>

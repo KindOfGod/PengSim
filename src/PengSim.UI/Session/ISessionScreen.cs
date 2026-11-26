@@ -28,6 +28,6 @@ internal interface ISessionScreen : IDisposable
     /// <summary>Displays the latest generation progress and timings.</summary>
     void ShowProgress(RunProgress progress);
 
-    /// <summary>Shows the completed run and returns true when the user chooses Analyze.</summary>
+    /// <summary>Shows the completed run, returning true on Enter or A and false on Q.</summary>
     bool WaitForAnalysis(RunProgress result);
 }

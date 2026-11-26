@@ -326,3 +326,7 @@ Parameter runs, replay codes, and the built-in demo all go through the same menu
 The old cube-coordinate rounding broke equal-distance ties in axis order. At L3 a 100/100/100 map reached radius 12 on Q and 13 on R and S, giving the overview unequal edges.
 
 `HexGridScale` now chooses the nearest coarse center using exact squared distances. A tie goes to the innermost hex ring. Ties within one ring use a consistent turn around the map center, so rotating the base grid rotates the assignments. Only playable cells contribute, so the outer groups can be partial. The outline follows the measured bucket bounds, and each penguin contributes once per level.
+
+## Enter opens analysis
+
+The completion screen offers Enter to open analysis, matching the key used to confirm simulation parameters and start a fast run. A remains a shortcut and Q exits from the summary.

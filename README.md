@@ -8,7 +8,7 @@ PengSim is a .NET 10 terminal application for exploring a penguin simulation on 
 
 Escape in a prompt returns to the menu.
 
-Next, choose how to calculate the run: **Enter** calculates all steps at once, and **P** calculates them one at a time with a progress bar. When generation finishes, review the elapsed time, speed, and simulation details, then press **A** to analyze the run from its starting positions.
+Press **Enter** to calculate all steps at once, or **P** to calculate them one at a time with a progress bar. When generation finishes, review the elapsed time, speed, and simulation details, then press **Enter** to analyze the run from its starting positions.
 
 Every run has a **parameter code**. It is shown in the analysis header next to the run's name and printed to the terminal when the app exits. Paste it into **[2]** to recreate the same run, including the seeded penguin placement. Wind and temperature are part of the code but do not affect movement yet.
 
@@ -28,7 +28,7 @@ If input or output is redirected, the menu is skipped and the demo prints one pl
 PENGSIM_PROFILE=1 dotnet run --project src/PengSim.UI
 ```
 
-Start a simulation from the menu, press **A** to analyze it, then navigate or play back frames. Press **Q** to write `pengsim-profile.log` in the working directory. The report includes the rendered frame count, initial heatmap build time, average frame preparation time, and average and slowest output updates. Set `PENGSIM_PROFILE_PATH` to choose another file. Redirected runs profile one overview frame.
+Start a simulation from the menu, press **Enter** at the completion screen to analyze it, then navigate or play back frames. Press **Q** to write `pengsim-profile.log` in the working directory. The report includes the rendered frame count, initial heatmap build time, average frame preparation time, and average and slowest output updates. Set `PENGSIM_PROFILE_PATH` to choose another file. Redirected runs profile one overview frame.
 
 ## Visualization
 
